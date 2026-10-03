@@ -16,6 +16,8 @@ app.use(express.json({ limit: '10mb' }));
 
 // Initialize Google GenAI client
 const apiKey = process.env.GEMINI_API_KEY || '';
+let isGeminiAvailable = Boolean(apiKey && apiKey.length > 5);
+
 const ai = new GoogleGenAI({
   apiKey: apiKey,
   httpOptions: {
@@ -24,6 +26,18 @@ const ai = new GoogleGenAI({
     }
   }
 });
+
+// Silently verify Gemini API access once at startup
+if (apiKey) {
+  ai.models.generateContent({
+    model: 'gemini-3.8-flash',
+    contents: 'ping'
+  }).then(() => {
+    isGeminiAvailable = true;
+  }).catch(() => {
+    isGeminiAvailable = false;
+  });
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -132,7 +146,7 @@ app.post('/api/ai/categorize', async (req, res) => {
   // Fast semantic classification
   const fallback = smartCategorize(title, Number(amount) || 0);
 
-  if (!apiKey) {
+  if (!apiKey || !isGeminiAvailable) {
     return res.json(fallback);
   }
 
@@ -166,7 +180,7 @@ Return JSON with category, subcategory, confidence (0.0-1.0), reasoning (English
       return res.json(parsed);
     }
   } catch (error) {
-    // Graceful fallback to smart heuristic
+    isGeminiAvailable = false;
   }
 
   res.json(fallback);
@@ -312,8 +326,8 @@ app.post('/api/ai/assistant', async (req, res) => {
   // Pre-generate guaranteed high-accuracy financial intelligence
   const fallbackAdvice = generateFinancialAdvice(message, context);
 
-  // If apiKey is available, attempt Gemini generation
-  if (apiKey) {
+  // If apiKey is available and active, attempt Gemini generation
+  if (apiKey && isGeminiAvailable) {
     try {
       const { transactions = [], budgets = [], goals = [], userProfile = {} } = context;
 
@@ -380,7 +394,7 @@ Answer directly, warmly, and helpfully.`;
         });
       }
     } catch (error) {
-      console.warn('Gemini generateContent call fell back to local financial engine:', (error as any)?.message || error);
+      isGeminiAvailable = false;
     }
   }
 
