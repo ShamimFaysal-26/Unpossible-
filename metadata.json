@@ -1,0 +1,8 @@
+{
+  "name": "FinSathi AI - Bangla Personal Finance",
+  "description": "AI-powered personal finance management platform for Bangladeshi users with Bangla and Banglish NLP assistant, smart transaction categorization, budget tracking, and savings goals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
