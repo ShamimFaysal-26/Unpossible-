@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Transaction,
   Budget,
@@ -10,7 +10,6 @@ import {
 } from '../types/finance';
 import {
   initialUser,
-  initialTransactions,
   initialBudgets,
   initialGoals,
   initialInsights
@@ -18,12 +17,12 @@ import {
 import { fetchAiInsights } from '../services/api';
 import { validateFirestoreConnection } from '../lib/firebase';
 import {
-  fetchTransactionsFromDb,
+  subscribeTransactions,
+  subscribeBudgets,
+  subscribeGoals,
   saveTransactionToDb,
   deleteTransactionFromDb,
-  fetchBudgetsFromDb,
   saveBudgetToDb,
-  fetchGoalsFromDb,
   saveGoalToDb,
   deleteGoalFromDb,
   clearAllDataFromFirestore
@@ -44,21 +43,21 @@ interface FinanceContextType {
   resetAllDataToEmpty: () => Promise<void>;
   
   // Transaction CRUD & Quick Interactivity
-  addTransaction: (tx: Omit<Transaction, 'id'>) => Transaction;
-  quickAddExpense: (title: string, amount: number, category: TransactionCategory) => void;
-  updateTransaction: (id: string, tx: Partial<Transaction>) => void;
-  deleteTransaction: (id: string) => void;
-  importTransactionsFromCsv: (newTxList: Omit<Transaction, 'id'>[]) => number;
+  addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<Transaction>;
+  quickAddExpense: (title: string, amount: number, category: TransactionCategory) => Promise<void>;
+  updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  importTransactionsFromCsv: (newTxList: Omit<Transaction, 'id'>[]) => Promise<number>;
   
   // Budget operations
-  updateBudgetLimit: (category: TransactionCategory, newLimit: number) => void;
-  adjustBudgetDelta: (category: TransactionCategory, delta: number) => void;
+  updateBudgetLimit: (category: TransactionCategory, newLimit: number) => Promise<void>;
+  adjustBudgetDelta: (category: TransactionCategory, delta: number) => Promise<void>;
   
   // Goals operations
-  addSavingsGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => void;
-  contributeToGoal: (goalId: string, amount: number) => void;
-  withdrawFromGoal: (goalId: string, amount: number) => void;
-  deleteGoal: (goalId: string) => void;
+  addSavingsGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => Promise<void>;
+  contributeToGoal: (goalId: string, amount: number) => Promise<void>;
+  withdrawFromGoal: (goalId: string, amount: number) => Promise<void>;
+  deleteGoal: (goalId: string) => Promise<void>;
   
   // UI Navigation & Modals
   activeTab: 'overview' | 'transactions' | 'budgets' | 'goals' | 'analytics' | 'assistant';
@@ -76,7 +75,7 @@ interface FinanceContextType {
   formatMoney: (amount: number) => string;
   
   // Database status
-  dbInfo: { connected: boolean; engine: string; details: string };
+  dbInfo: { connected: boolean; engine: string; details: string; isSyncing: boolean };
   checkDb: () => Promise<void>;
 
   // Calculated summaries
@@ -91,63 +90,55 @@ interface FinanceContextType {
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Wipe legacy demo cache if cleaning flag is not present
-  useEffect(() => {
-    const isCleaned = localStorage.getItem('finsathi_clean_v3');
-    if (!isCleaned) {
-      localStorage.removeItem('finsathi_transactions');
-      localStorage.removeItem('finsathi_transactions_en');
-      localStorage.removeItem('finsathi_goals');
-      localStorage.removeItem('finsathi_goals_en');
-      localStorage.removeItem('finsathi_insights');
-      localStorage.removeItem('finsathi_insights_en');
-      localStorage.setItem('finsathi_clean_v3', 'true');
-      clearAllDataFromFirestore();
-    }
-  }, []);
+const LOCAL_STORAGE_KEYS = {
+  USER: 'finsathi_user_permanent',
+  CURRENCY: 'finsathi_currency_permanent',
+  TRANSACTIONS: 'finsathi_transactions_permanent',
+  BUDGETS: 'finsathi_budgets_permanent',
+  GOALS: 'finsathi_goals_permanent',
+  INSIGHTS: 'finsathi_insights_permanent'
+};
 
+export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 1. Initial State from Permanent LocalStorage Cache
   const [user, setUserState] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('finsathi_user_clean');
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.USER);
     return saved ? JSON.parse(saved) : initialUser;
   });
 
   const [currency, setCurrencyState] = useState<string>(() => {
-    return localStorage.getItem('finsathi_currency') || '$';
+    return localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENCY) || '$';
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const isCleaned = localStorage.getItem('finsathi_clean_v3');
-    if (!isCleaned) return [];
-    const saved = localStorage.getItem('finsathi_transactions_clean');
-    return saved ? JSON.parse(saved) : initialTransactions;
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [budgets, setBudgets] = useState<Budget[]>(() => {
-    const saved = localStorage.getItem('finsathi_budgets_clean');
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.BUDGETS);
     return saved ? JSON.parse(saved) : initialBudgets;
   });
 
   const [goals, setGoals] = useState<SavingsGoal[]>(() => {
-    const isCleaned = localStorage.getItem('finsathi_clean_v3');
-    if (!isCleaned) return [];
-    const saved = localStorage.getItem('finsathi_goals_clean');
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.GOALS);
     return saved ? JSON.parse(saved) : initialGoals;
   });
 
   const [insights, setInsights] = useState<FinancialInsight[]>(() => {
-    const saved = localStorage.getItem('finsathi_insights_clean');
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.INSIGHTS);
     return saved ? JSON.parse(saved) : initialInsights;
   });
 
   const [anomalyAlerts, setAnomalyAlerts] = useState<AnomalyReport[]>([]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState<boolean>(false);
 
-  // Live Database info state
-  const [dbInfo, setDbInfo] = useState<{ connected: boolean; engine: string; details: string }>({
+  // Database info & status
+  const [dbInfo, setDbInfo] = useState<{ connected: boolean; engine: string; details: string; isSyncing: boolean }>({
     connected: true,
     engine: 'Firebase Cloud Firestore',
-    details: 'Connected to Firestore cloud database. Clean and ready for your data.'
+    details: 'Connected to Firestore. Real-time permanent synchronization active.',
+    isSyncing: false
   });
 
   // UI state
@@ -159,77 +150,163 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setUser = (u: UserProfile) => {
     setUserState(u);
-    localStorage.setItem('finsathi_user_clean', JSON.stringify(u));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(u));
   };
 
   const setCurrency = (c: string) => {
     setCurrencyState(c);
-    localStorage.setItem('finsathi_currency', c);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENCY, c);
   };
 
-  // Sync with Firestore on mount
+  // Keep LocalStorage in sync whenever state changes
   useEffect(() => {
-    async function initFirestore() {
-      const isConnected = await validateFirestoreConnection();
-      if (isConnected) {
-        setDbInfo({
-          connected: true,
-          engine: 'Firebase Cloud Firestore',
-          details: 'Connected to Firestore. Clean database ready for your inputs.'
-        });
-
-        const dbTx = await fetchTransactionsFromDb();
-        setTransactions(dbTx);
-
-        const dbBudgets = await fetchBudgetsFromDb();
-        if (dbBudgets && dbBudgets.length > 0) {
-          setBudgets(dbBudgets);
-        }
-
-        const dbGoals = await fetchGoalsFromDb();
-        setGoals(dbGoals);
-      }
-    }
-    initFirestore();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('finsathi_transactions_clean', JSON.stringify(transactions));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('finsathi_budgets_clean', JSON.stringify(budgets));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(budgets));
   }, [budgets]);
 
   useEffect(() => {
-    localStorage.setItem('finsathi_goals_clean', JSON.stringify(goals));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(goals));
   }, [goals]);
 
   useEffect(() => {
-    localStorage.setItem('finsathi_insights_clean', JSON.stringify(insights));
+    localStorage.setItem(LOCAL_STORAGE_KEYS.INSIGHTS, JSON.stringify(insights));
   }, [insights]);
 
+  // Keep track of whether initial cloud sync has completed
+  const hasLoadedRemoteTxs = useRef(false);
+  const hasLoadedRemoteBudgets = useRef(false);
+  const hasLoadedRemoteGoals = useRef(false);
+
+  // 2. Real-Time Cloud Firestore Sync with onSnapshot listeners
+  useEffect(() => {
+    let unsubTxs: (() => void) | undefined;
+    let unsubBudgets: (() => void) | undefined;
+    let unsubGoals: (() => void) | undefined;
+
+    async function initFirestoreRealtime() {
+      try {
+        setDbInfo(prev => ({ ...prev, isSyncing: true }));
+        const isConnected = await validateFirestoreConnection();
+
+        if (isConnected) {
+          setDbInfo({
+            connected: true,
+            engine: 'Firebase Cloud Firestore',
+            details: 'Connected to Firestore cloud database. Permanent real-time sync active.',
+            isSyncing: false
+          });
+
+          // Subscribe to Transactions
+          unsubTxs = subscribeTransactions((cloudTxs) => {
+            if (cloudTxs.length > 0) {
+              setTransactions(cloudTxs);
+              hasLoadedRemoteTxs.current = true;
+            } else if (!hasLoadedRemoteTxs.current) {
+              // If cloud is empty on first load, check if local storage had user transactions to push to cloud
+              hasLoadedRemoteTxs.current = true;
+              const localTxsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
+              if (localTxsStr) {
+                try {
+                  const localTxs: Transaction[] = JSON.parse(localTxsStr);
+                  if (localTxs.length > 0) {
+                    localTxs.forEach(t => saveTransactionToDb(t));
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse local transactions:', e);
+                }
+              }
+            } else {
+              setTransactions([]);
+            }
+          });
+
+          // Subscribe to Budgets
+          unsubBudgets = subscribeBudgets((cloudBudgets) => {
+            if (cloudBudgets.length > 0) {
+              setBudgets(cloudBudgets);
+              hasLoadedRemoteBudgets.current = true;
+            } else if (!hasLoadedRemoteBudgets.current) {
+              hasLoadedRemoteBudgets.current = true;
+              const localBudgetsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.BUDGETS);
+              if (localBudgetsStr) {
+                try {
+                  const localBudgets: Budget[] = JSON.parse(localBudgetsStr);
+                  if (localBudgets.length > 0) {
+                    localBudgets.forEach(b => saveBudgetToDb(b));
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse local budgets:', e);
+                }
+              }
+            }
+          });
+
+          // Subscribe to Goals
+          unsubGoals = subscribeGoals((cloudGoals) => {
+            if (cloudGoals.length > 0) {
+              setGoals(cloudGoals);
+              hasLoadedRemoteGoals.current = true;
+            } else if (!hasLoadedRemoteGoals.current) {
+              hasLoadedRemoteGoals.current = true;
+              const localGoalsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.GOALS);
+              if (localGoalsStr) {
+                try {
+                  const localGoals: SavingsGoal[] = JSON.parse(localGoalsStr);
+                  if (localGoals.length > 0) {
+                    localGoals.forEach(g => saveGoalToDb(g));
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse local goals:', e);
+                }
+              }
+            } else {
+              setGoals([]);
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Real-time listener setup error:', err);
+        setDbInfo(prev => ({ ...prev, isSyncing: false }));
+      }
+    }
+
+    initFirestoreRealtime();
+
+    return () => {
+      if (unsubTxs) unsubTxs();
+      if (unsubBudgets) unsubBudgets();
+      if (unsubGoals) unsubGoals();
+    };
+  }, []);
+
   const checkDb = async () => {
+    setDbInfo(prev => ({ ...prev, isSyncing: true }));
     const isConnected = await validateFirestoreConnection();
     setDbInfo({
       connected: isConnected,
       engine: 'Firebase Cloud Firestore',
       details: isConnected
-        ? 'Connected to Firestore. All your transactions and budgets sync directly to the cloud.'
-        : 'Connecting to Firestore cloud database...'
+        ? 'Connected to Firestore. All transactions, budgets, and goals are permanently stored in the cloud.'
+        : 'Connecting to Firestore cloud database...',
+      isSyncing: false
     });
   };
 
-  // Full reset / clear database action
+  // Full reset / clear database action (Only when user explicitly clicks Wipe All Data)
   const resetAllDataToEmpty = async () => {
+    setDbInfo(prev => ({ ...prev, isSyncing: true }));
     setTransactions([]);
     setGoals([]);
     setInsights([]);
     setAnomalyAlerts([]);
-    localStorage.removeItem('finsathi_transactions_clean');
-    localStorage.removeItem('finsathi_goals_clean');
-    localStorage.removeItem('finsathi_insights_clean');
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.GOALS);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.INSIGHTS);
     await clearAllDataFromFirestore();
+    setDbInfo(prev => ({ ...prev, isSyncing: false }));
   };
 
   // Currency Formatter
@@ -243,10 +320,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Month calculation
   const currentMonthSummary = useMemo(() => {
-    const currentMonthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
-    // Also include any transactions from October 2026 or current date
-    const monthTx = transactions.filter(t => t.date.startsWith(currentMonthPrefix) || t.date.startsWith('2026-10') || transactions.length < 5);
-
     let totalIncome = 0;
     let totalExpense = 0;
     const categoryTotals: Record<string, number> = {};
@@ -336,20 +409,33 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Add Transaction + Save to Firestore
-  const addTransaction = (newTx: Omit<Transaction, 'id'>): Transaction => {
+  // Add Transaction + Save to Firestore Permanently
+  const addTransaction = async (newTx: Omit<Transaction, 'id'>): Promise<Transaction> => {
     const created: Transaction = {
       ...newTx,
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     };
+    // 1. Immediate optimistic UI & LocalStorage update
     setTransactions(prev => [created, ...prev]);
-    saveTransactionToDb(created);
+    const updatedList = [created, ...transactions];
+    localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updatedList));
+
+    // 2. Permanent Firestore write
+    try {
+      setDbInfo(prev => ({ ...prev, isSyncing: true }));
+      await saveTransactionToDb(created);
+    } catch (err) {
+      console.warn('Background Firestore write warning:', err);
+    } finally {
+      setDbInfo(prev => ({ ...prev, isSyncing: false }));
+    }
+
     return created;
   };
 
-  // Quick 1-click interactive expense addition
-  const quickAddExpense = (title: string, amount: number, category: TransactionCategory) => {
-    addTransaction({
+  // Quick 1-click expense addition
+  const quickAddExpense = async (title: string, amount: number, category: TransactionCategory) => {
+    await addTransaction({
       title,
       amount,
       type: 'expense',
@@ -361,36 +447,80 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Update Transaction + Save to Firestore
-  const updateTransaction = (id: string, updatedFields: Partial<Transaction>) => {
+  const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
+    let updatedTarget: Transaction | undefined;
     setTransactions(prev => {
-      const updated = prev.map(tx => (tx.id === id ? { ...tx, ...updatedFields } : tx));
-      const target = updated.find(t => t.id === id);
-      if (target) {
-        saveTransactionToDb(target);
-      }
+      const updated = prev.map(tx => {
+        if (tx.id === id) {
+          updatedTarget = { ...tx, ...updatedFields };
+          return updatedTarget;
+        }
+        return tx;
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updated));
       return updated;
     });
+
+    if (updatedTarget) {
+      try {
+        setDbInfo(prev => ({ ...prev, isSyncing: true }));
+        await saveTransactionToDb(updatedTarget);
+      } catch (err) {
+        console.warn('Firestore update warning:', err);
+      } finally {
+        setDbInfo(prev => ({ ...prev, isSyncing: false }));
+      }
+    }
   };
 
   // Delete Transaction + Remove from Firestore
-  const deleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(tx => tx.id !== id));
-    deleteTransactionFromDb(id);
+  const deleteTransaction = async (id: string) => {
+    setTransactions(prev => {
+      const filtered = prev.filter(tx => tx.id !== id);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(filtered));
+      return filtered;
+    });
+
+    try {
+      setDbInfo(prev => ({ ...prev, isSyncing: true }));
+      await deleteTransactionFromDb(id);
+    } catch (err) {
+      console.warn('Firestore delete warning:', err);
+    } finally {
+      setDbInfo(prev => ({ ...prev, isSyncing: false }));
+    }
   };
 
   // Batch CSV Import + Save to Firestore
-  const importTransactionsFromCsv = (newTxList: Omit<Transaction, 'id'>[]): number => {
+  const importTransactionsFromCsv = async (newTxList: Omit<Transaction, 'id'>[]): Promise<number> => {
     const formatted: Transaction[] = newTxList.map((tx, idx) => ({
       ...tx,
       id: `tx_csv_${Date.now()}_${idx}`
     }));
-    setTransactions(prev => [...formatted, ...prev]);
-    formatted.forEach(tx => saveTransactionToDb(tx));
+
+    setTransactions(prev => {
+      const merged = [...formatted, ...prev];
+      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(merged));
+      return merged;
+    });
+
+    try {
+      setDbInfo(prev => ({ ...prev, isSyncing: true }));
+      for (const tx of formatted) {
+        await saveTransactionToDb(tx);
+      }
+    } catch (err) {
+      console.warn('Firestore batch import warning:', err);
+    } finally {
+      setDbInfo(prev => ({ ...prev, isSyncing: false }));
+    }
+
     return formatted.length;
   };
 
   // Update Budget Limit + Save to Firestore
-  const updateBudgetLimit = (category: TransactionCategory, newLimit: number) => {
+  const updateBudgetLimit = async (category: TransactionCategory, newLimit: number) => {
+    let targetBudget: Budget | undefined;
     setBudgets(prev => {
       const exists = prev.find(b => b.category === category);
       let updated: Budget[];
@@ -399,65 +529,110 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         updated = [...prev, { id: `b_${Date.now()}`, category, monthlyLimit: newLimit, month: '2026-10' }];
       }
-      const bObj = updated.find(b => b.category === category);
-      if (bObj) {
-        saveBudgetToDb(bObj);
-      }
+      targetBudget = updated.find(b => b.category === category);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(updated));
       return updated;
     });
+
+    if (targetBudget) {
+      try {
+        await saveBudgetToDb(targetBudget);
+      } catch (err) {
+        console.warn('Firestore budget save warning:', err);
+      }
+    }
   };
 
   // Adjust Budget by delta (+/- 50) + Save to Firestore
-  const adjustBudgetDelta = (category: TransactionCategory, delta: number) => {
+  const adjustBudgetDelta = async (category: TransactionCategory, delta: number) => {
+    let targetBudget: Budget | undefined;
     setBudgets(prev => {
       const updated = prev.map(b => (b.category === category ? { ...b, monthlyLimit: Math.max(0, b.monthlyLimit + delta) } : b));
-      const bObj = updated.find(b => b.category === category);
-      if (bObj) {
-        saveBudgetToDb(bObj);
-      }
+      targetBudget = updated.find(b => b.category === category);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(updated));
       return updated;
     });
+
+    if (targetBudget) {
+      try {
+        await saveBudgetToDb(targetBudget);
+      } catch (err) {
+        console.warn('Firestore budget delta save warning:', err);
+      }
+    }
   };
 
   // Add Goal + Save to Firestore
-  const addSavingsGoal = (newGoal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => {
+  const addSavingsGoal = async (newGoal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => {
     const goal: SavingsGoal = {
       ...newGoal,
       id: `goal_${Date.now()}`,
       currentAmount: 0
     };
-    setGoals(prev => [goal, ...prev]);
-    saveGoalToDb(goal);
+    setGoals(prev => {
+      const updated = [goal, ...prev];
+      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await saveGoalToDb(goal);
+    } catch (err) {
+      console.warn('Firestore goal save warning:', err);
+    }
   };
 
   // Contribute to Goal + Save to Firestore
-  const contributeToGoal = (goalId: string, amount: number) => {
+  const contributeToGoal = async (goalId: string, amount: number) => {
+    let targetGoal: SavingsGoal | undefined;
     setGoals(prev => {
       const updated = prev.map(g => (g.id === goalId ? { ...g, currentAmount: Math.min(g.targetAmount, g.currentAmount + amount) } : g));
-      const target = updated.find(g => g.id === goalId);
-      if (target) {
-        saveGoalToDb(target);
-      }
+      targetGoal = updated.find(g => g.id === goalId);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
       return updated;
     });
+
+    if (targetGoal) {
+      try {
+        await saveGoalToDb(targetGoal);
+      } catch (err) {
+        console.warn('Firestore goal contribute warning:', err);
+      }
+    }
   };
 
   // Withdraw from Goal + Save to Firestore
-  const withdrawFromGoal = (goalId: string, amount: number) => {
+  const withdrawFromGoal = async (goalId: string, amount: number) => {
+    let targetGoal: SavingsGoal | undefined;
     setGoals(prev => {
       const updated = prev.map(g => (g.id === goalId ? { ...g, currentAmount: Math.max(0, g.currentAmount - amount) } : g));
-      const target = updated.find(g => g.id === goalId);
-      if (target) {
-        saveGoalToDb(target);
-      }
+      targetGoal = updated.find(g => g.id === goalId);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
       return updated;
     });
+
+    if (targetGoal) {
+      try {
+        await saveGoalToDb(targetGoal);
+      } catch (err) {
+        console.warn('Firestore goal withdraw warning:', err);
+      }
+    }
   };
 
   // Delete Goal + Remove from Firestore
-  const deleteGoal = (goalId: string) => {
-    setGoals(prev => prev.filter(g => g.id !== goalId));
-    deleteGoalFromDb(goalId);
+  const deleteGoal = async (goalId: string) => {
+    setGoals(prev => {
+      const filtered = prev.filter(g => g.id !== goalId);
+      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(filtered));
+      return filtered;
+    });
+
+    try {
+      await deleteGoalFromDb(goalId);
+    } catch (err) {
+      console.warn('Firestore goal delete warning:', err);
+    }
   };
 
   return (
