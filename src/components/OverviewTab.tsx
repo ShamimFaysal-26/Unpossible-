@@ -6,13 +6,15 @@ import {
   Wallet,
   PiggyBank,
   ArrowUpRight,
-  ArrowDownRight,
   Plus,
   UploadCloud,
   Sparkles,
   ChevronRight,
   Target,
-  AlertCircle
+  Database,
+  ArrowRight,
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
 import { categoryLabels } from '../data/initialData';
 import { UnusualSpendingAlert } from './UnusualSpendingAlert';
@@ -22,9 +24,7 @@ import advisorAvatarImg from '../assets/images/avatar_fin_advisor_1791045585813.
 export const OverviewTab: React.FC = () => {
   const {
     currentMonthSummary,
-    language,
-    formatTaka,
-    toBengaliNumber,
+    formatMoney,
     transactions,
     budgets,
     goals,
@@ -32,72 +32,72 @@ export const OverviewTab: React.FC = () => {
     setActiveTab,
     setIsAddModalOpen,
     setIsImportModalOpen,
+    setIsDbModalOpen,
     user
   } = useFinance();
 
   const { totalIncome, totalExpense, netBalance, savingsRate, categoryTotals } = currentMonthSummary;
 
-  // Recent 6 transactions
+  const hasTransactions = transactions.length > 0;
   const recentTransactions = transactions.slice(0, 6);
 
-  // Top 4 categories by spend
   const sortedCategories = Object.entries(categoryTotals)
+    .filter(([_, amt]) => amt > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
-  // Primary active goal
-  const primaryGoal = goals[0];
+  const primaryGoal = goals.length > 0 ? goals[0] : null;
 
   return (
     <div className="space-y-6">
-      {/* Hero Welcome & Financial Snapshot Card */}
+      {/* Hero Welcome & Quick Summary Banner */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white p-6 sm:p-8 shadow-sm">
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-8 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
-                {language === 'bn' ? 'অক্টোবর ২০২৬ অর্থ সেশন' : 'October 2026 Financial Cycle'}
+              <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded border border-emerald-500/30">
+                Connected Database &middot; Clean Slate
               </span>
               <span className="text-xs text-slate-300 font-medium">
-                {language === 'bn' ? `স্বাগতম, ${user.nameBn}` : `Welcome back, ${user.name}`}
+                {user.name}
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              {language === 'bn'
-                ? 'আপনার আর্থিক লক্ষ্য অর্জনে ফিনসাথী পাশে আছে'
-                : 'Intelligent Financial Control Tailored for Bangladesh'}
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+              {hasTransactions
+                ? 'Your Personal Financial Dashboard & Budget Control'
+                : 'Welcome to FinSathi AI — Your Personal Finance Hub'}
             </h1>
 
-            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-              {language === 'bn'
-                ? `এই মাসে আপনার সঞ্চয়ের হার ${toBengaliNumber(savingsRate)}%। নির্ধারিত বাজেটের মধ্যে খরচ রেখে সঞ্চয় তহবিলে নিয়মিত অবদান রাখুন।`
-                : `Your monthly savings rate is currently at ${savingsRate}%. Track your daily bKash, card, and cash spends with real-time AI guidance.`}
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              {hasTransactions
+                ? `You have saved ${savingsRate}% of your income with ${formatMoney(netBalance)} in net balance this cycle. Live sync is active with your Firestore database.`
+                : 'Your database is completely clean and connected to Firebase Cloud Firestore. Record your first transaction, set category budgets, or import a bank CSV export to begin.'}
             </p>
 
-            <div className="pt-2 flex flex-wrap items-center gap-3">
+            <div className="pt-2 flex flex-wrap items-center gap-2.5">
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold text-xs rounded-lg transition-colors shadow-sm active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-lg transition-colors shadow-sm active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>{language === 'bn' ? 'নতুন খরচ যোগ করুন' : 'Record Transaction'}</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('assistant')}
-                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 text-white text-xs font-medium rounded-lg border border-white/20 transition-colors backdrop-blur-xs"
-              >
-                <Sparkles className="w-4 h-4 text-emerald-300" />
-                <span>{language === 'bn' ? 'এআই সহকারীর সাথে কথা বলুন' : 'Ask AI Assistant'}</span>
+                <span>Add Your First Transaction</span>
               </button>
 
               <button
                 onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-2 px-3.5 py-2 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 text-white text-xs font-semibold rounded-lg border border-white/20 transition-colors backdrop-blur-xs"
               >
                 <UploadCloud className="w-4 h-4" />
-                <span>{language === 'bn' ? 'সিএসভি ফাইল আপলোড' : 'Import CSV'}</span>
+                <span>Import CSV File</span>
+              </button>
+
+              <button
+                onClick={() => setIsDbModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Firestore Live</span>
               </button>
             </div>
           </div>
@@ -111,9 +111,9 @@ export const OverviewTab: React.FC = () => {
                 className="w-full h-44 object-cover brightness-95 contrast-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-3">
-                <span className="text-xs font-medium text-emerald-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {language === 'bn' ? 'বাংলা ও বাংলিশ এনএলপি সংযুক্ত' : 'Bangla & Banglish NLP active'}
+                <span className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Cloud Firestore Sync Ready
                 </span>
               </div>
             </div>
@@ -124,13 +124,13 @@ export const OverviewTab: React.FC = () => {
       {/* Unusual Spending Alert (Anomaly Detection) */}
       <UnusualSpendingAlert />
 
-      {/* 4 Primary Financial KPI Cards with Tabular Numerals */}
+      {/* 4 Primary Financial KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Income */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {language === 'bn' ? 'মোট আয় (চলতি মাস)' : 'Total Monthly Income'}
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Recorded Income
             </span>
             <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
               <TrendingUp className="w-4 h-4" />
@@ -138,20 +138,19 @@ export const OverviewTab: React.FC = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold tracking-tight text-slate-900 font-tabular">
-              {formatTaka(totalIncome)}
+              {formatMoney(totalIncome)}
             </div>
-            <div className="flex items-center gap-1 mt-1 text-xs text-emerald-600 font-medium">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'বেতন ও ফ্রিল্যান্স জমা' : 'Salary & Freelance verified'}</span>
+            <div className="flex items-center gap-1 mt-1 text-xs text-slate-500 font-medium">
+              <span>{transactions.filter(t => t.type === 'income').length} income entries</span>
             </div>
           </div>
         </div>
 
         {/* Total Expense */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {language === 'bn' ? 'মোট ব্যয় (চলতি মাস)' : 'Total Monthly Expense'}
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Total Recorded Expenses
             </span>
             <div className="p-2 rounded-lg bg-rose-50 text-rose-600">
               <TrendingDown className="w-4 h-4" />
@@ -159,19 +158,19 @@ export const OverviewTab: React.FC = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold tracking-tight text-slate-900 font-tabular">
-              {formatTaka(totalExpense)}
+              {formatMoney(totalExpense)}
             </div>
             <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-              <span>{language === 'bn' ? '১৫টি লেনদেন রেকর্ডকৃত' : '15 logged transactions'}</span>
+              <span>{transactions.filter(t => t.type === 'expense').length} expense entries</span>
             </div>
           </div>
         </div>
 
         {/* Net Savings Surplus */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {language === 'bn' ? 'অবশিষ্ট উদ্বৃত্ত স্থিতি' : 'Net Surplus Balance'}
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Net Balance Surplus
             </span>
             <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
               <Wallet className="w-4 h-4" />
@@ -179,19 +178,19 @@ export const OverviewTab: React.FC = () => {
           </div>
           <div className="mt-3">
             <div className={`text-2xl font-bold tracking-tight font-tabular ${netBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
-              {formatTaka(netBalance)}
+              {formatMoney(netBalance)}
             </div>
-            <div className="flex items-center gap-1 mt-1 text-xs text-indigo-600 font-medium">
-              <span>{language === 'bn' ? 'বাজেট ও লক্ষ্যমাত্রায় ব্যবহারযোগ্য' : 'Available for allocation'}</span>
+            <div className="flex items-center gap-1 mt-1 text-xs text-indigo-600 font-semibold">
+              <span>{netBalance >= 0 ? 'Positive cash flow' : 'Deficit'}</span>
             </div>
           </div>
         </div>
 
         {/* Savings Rate */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">
-              {language === 'bn' ? 'সঞ্চয়ের হার' : 'Savings Rate'}
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Savings Rate
             </span>
             <div className="p-2 rounded-lg bg-amber-50 text-amber-600">
               <PiggyBank className="w-4 h-4" />
@@ -199,10 +198,9 @@ export const OverviewTab: React.FC = () => {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold tracking-tight text-slate-900 font-tabular">
-              {language === 'bn' ? `${toBengaliNumber(savingsRate)}%` : `${savingsRate}%`}
+              {savingsRate}%
             </div>
-            {/* Small progress bar */}
-            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2.5 overflow-hidden">
               <div
                 className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, Math.max(0, savingsRate))}%` }}
@@ -220,81 +218,96 @@ export const OverviewTab: React.FC = () => {
           <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  {language === 'bn' ? 'শীর্ষ ব্যয় ক্যাটাগরি ও বাজেট' : 'Top Spending Categories & Budget Limits'}
+                <h2 className="text-base font-bold text-slate-900">
+                  Category Expenses & Monthly Budgets
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {language === 'bn' ? 'বর্তমান মাসের ক্যাটাগরিভিত্তিক খরচের অগ্রগতি' : 'Monthly expense consumption per category'}
+                  Track spending progress against your target limits
                 </p>
               </div>
               <button
                 onClick={() => setActiveTab('budgets')}
-                className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
               >
-                <span>{language === 'bn' ? 'সকল বাজেট দেখুন' : 'Manage Budgets'}</span>
+                <span>Set Budgets</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              {sortedCategories.map(([category, amount]) => {
-                const budgetItem = budgets.find(b => b.category === category);
-                const limit = budgetItem ? budgetItem.monthlyLimit : 0;
-                const percentage = limit > 0 ? Math.round((amount / limit) * 100) : 0;
-                const isOverBudget = percentage >= 100;
-                const isNearLimit = percentage >= 80 && percentage < 100;
-                const catMeta = categoryLabels[category as keyof typeof categoryLabels] || {
-                  bn: category,
-                  en: category,
-                  color: '#64748b'
-                };
+            {sortedCategories.length === 0 ? (
+              <div className="py-8 px-4 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50">
+                <p className="text-xs font-semibold text-slate-700">No expenses recorded yet</p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                  Log your daily expenses or set category budgets to visualize your spending breakdown here.
+                </p>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Record an Expense</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sortedCategories.map(([category, amount]) => {
+                  const budgetItem = budgets.find(b => b.category === category);
+                  const limit = budgetItem ? budgetItem.monthlyLimit : 0;
+                  const percentage = limit > 0 ? Math.round((amount / limit) * 100) : 0;
+                  const isOverBudget = percentage >= 100;
+                  const isNearLimit = percentage >= 80 && percentage < 100;
+                  const catMeta = categoryLabels[category as keyof typeof categoryLabels] || {
+                    name: category,
+                    color: '#64748b'
+                  };
 
-                return (
-                  <div key={category} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: catMeta.color }}
+                  return (
+                    <div key={category} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: catMeta.color }}
+                          />
+                          <span className="font-semibold text-slate-800">
+                            {catMeta.name}
+                          </span>
+                          {isOverBudget && (
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
+                              Exceeded
+                            </span>
+                          )}
+                          {isNearLimit && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                              Near Limit
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-tabular text-slate-600">
+                          <span className="font-bold text-slate-900">{formatMoney(amount)}</span>
+                          {limit > 0 && (
+                            <span className="text-slate-400"> / {formatMoney(limit)} ({percentage}%)</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            isOverBudget
+                              ? 'bg-rose-500'
+                              : isNearLimit
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, percentage)}%` }}
                         />
-                        <span className="font-semibold text-slate-800">
-                          {language === 'bn' ? catMeta.bn : catMeta.en}
-                        </span>
-                        {isOverBudget && (
-                          <span className="text-[11px] font-medium text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
-                            {language === 'bn' ? 'বাজেট অতিক্রান্ত' : 'Exceeded'}
-                          </span>
-                        )}
-                        {isNearLimit && (
-                          <span className="text-[11px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                            {language === 'bn' ? 'সীমার সন্নিকটে' : 'Near Limit'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="font-tabular text-slate-600">
-                        <span className="font-bold text-slate-900">{formatTaka(amount)}</span>
-                        {limit > 0 && (
-                          <span className="text-slate-400"> / {formatTaka(limit)} ({language === 'bn' ? toBengaliNumber(percentage) : percentage}%)</span>
-                        )}
                       </div>
                     </div>
-
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          isOverBudget
-                            ? 'bg-rose-500'
-                            : isNearLimit
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${Math.min(100, percentage)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* AI-Generated Personalized Insights */}
@@ -304,157 +317,197 @@ export const OverviewTab: React.FC = () => {
                 <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  {language === 'bn' ? 'এআই আর্থিক মূল্যায়ন ও পর্যবেক্ষণ' : 'AI Financial Health Insights'}
+                <h2 className="text-base font-bold text-slate-900">
+                  AI Financial Health Diagnostics
                 </h2>
               </div>
               <button
                 onClick={() => setActiveTab('assistant')}
-                className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
               >
-                <span>{language === 'bn' ? 'সহকারীকে জিজ্ঞেস করুন' : 'Chat with AI'}</span>
+                <span>Ask AI Advisor</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              {insights.map((insight) => (
-                <div
-                  key={insight.id}
-                  className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/60 hover:bg-slate-50/80 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <h3 className="text-xs font-bold text-slate-900">
-                        {language === 'bn' ? insight.titleBn : insight.titleEn}
-                      </h3>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {language === 'bn' ? insight.descriptionBn : insight.descriptionEn}
-                      </p>
-                      {insight.actionBn && (
-                        <p className="text-xs font-medium text-emerald-700 pt-1 flex items-center gap-1">
-                          <span>→</span>
-                          <span>{language === 'bn' ? insight.actionBn : insight.actionEn}</span>
+            {insights.length === 0 ? (
+              <div className="py-6 px-4 text-center rounded-lg bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700">Awaiting financial inputs</p>
+                <p className="text-[11px] text-slate-500 mt-1 max-w-sm mx-auto">
+                  Once you add transactions or budgets, FinSathi AI will automatically analyze your spending habits, flag anomalies, and provide personalized savings tips.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {insights.map((insight) => (
+                  <div
+                    key={insight.id}
+                    className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/60 hover:bg-slate-50/80 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <h3 className="text-xs font-bold text-slate-900">
+                          {insight.title}
+                        </h3>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          {insight.description}
                         </p>
+                        {insight.action && (
+                          <p className="text-xs font-semibold text-emerald-700 pt-1 flex items-center gap-1">
+                            <span>&rarr;</span>
+                            <span>{insight.action}</span>
+                          </p>
+                        )}
+                      </div>
+                      {insight.metric && (
+                        <span className="text-[11px] font-bold text-slate-700 bg-white border border-slate-200 px-2 py-0.5 rounded shrink-0">
+                          {insight.metric}
+                        </span>
                       )}
                     </div>
-                    {insight.metric && (
-                      <span className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded shrink-0">
-                        {insight.metric}
-                      </span>
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Active Savings Goal & Recent Transactions */}
         <div className="lg:col-span-4 space-y-6">
           {/* Active Goal Spotlight */}
-          {primaryGoal && (
-            <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
-                    <Target className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    {language === 'bn' ? 'সঞ্চয় লক্ষ্যমাত্রা' : 'Savings Priority Goal'}
-                  </h2>
+          <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600">
+                  <Target className="w-4 h-4" />
                 </div>
-                <button
-                  onClick={() => setActiveTab('goals')}
-                  className="text-xs text-indigo-600 font-medium hover:underline"
-                >
-                  {language === 'bn' ? 'সব লক্ষ্য' : 'View all'}
-                </button>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Savings Goals
+                </h2>
               </div>
+              <button
+                onClick={() => setActiveTab('goals')}
+                className="text-xs text-indigo-600 font-semibold hover:underline"
+              >
+                Manage
+              </button>
+            </div>
 
+            {primaryGoal ? (
               <div className="space-y-3">
                 <div>
                   <h3 className="text-xs font-bold text-slate-800">
-                    {language === 'bn' ? (primaryGoal.titleBn || primaryGoal.title) : primaryGoal.title}
+                    {primaryGoal.title}
                   </h3>
-                  <div className="flex items-baseline justify-between mt-1 text-xs">
-                    <span className="font-tabular font-bold text-emerald-600 text-base">
-                      {formatTaka(primaryGoal.currentAmount)}
+                  <div className="flex items-baseline justify-between mt-1 text-xs font-tabular">
+                    <span className="font-bold text-emerald-600 text-base">
+                      {formatMoney(primaryGoal.currentAmount)}
                     </span>
-                    <span className="font-tabular text-slate-400">
-                      {language === 'bn' ? 'লক্ষ্য ' : 'Target '} {formatTaka(primaryGoal.targetAmount)}
+                    <span className="text-slate-400">
+                      Target {formatMoney(primaryGoal.targetAmount)}
                     </span>
                   </div>
                 </div>
 
-                {/* Progress bar */}
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div
                     className="bg-indigo-600 h-2 rounded-full transition-all"
                     style={{
-                      width: `${Math.min(100, Math.round((primaryGoal.currentAmount / primaryGoal.targetAmount) * 100))}%`
+                      width: `${Math.min(100, Math.round((primaryGoal.currentAmount / (primaryGoal.targetAmount || 1)) * 100))}%`
                     }}
                   />
                 </div>
 
-                <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-950 leading-relaxed">
-                  <p className="font-medium text-[11px] text-indigo-700 uppercase tracking-wider mb-0.5">
-                    {language === 'bn' ? 'এআই পরামর্শ' : 'AI Strategy'}
-                  </p>
-                  {language === 'bn' ? primaryGoal.aiRecommendationBn : primaryGoal.aiRecommendation}
-                </div>
+                {primaryGoal.aiRecommendation && (
+                  <div className="p-2.5 rounded-lg bg-indigo-50/60 border border-indigo-100 text-xs text-indigo-950 leading-relaxed">
+                    <p className="font-bold text-[10px] text-indigo-700 uppercase tracking-wider mb-0.5">
+                      Strategy
+                    </p>
+                    {primaryGoal.aiRecommendation}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="py-6 px-3 text-center rounded-lg bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700">No savings targets set</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Plan your emergency fund, equipment, or travel goals.
+                </p>
+                <button
+                  onClick={() => setActiveTab('goals')}
+                  className="mt-2.5 inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Create Goal</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Recent Transactions List */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-slate-900">
-                {language === 'bn' ? 'সাম্প্রতিক লেনদেন' : 'Recent Transactions'}
+              <h2 className="text-sm font-bold text-slate-900">
+                Recent Activity
               </h2>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className="text-xs font-medium text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
               >
-                <span>{language === 'bn' ? 'সবগুলো' : 'View all'}</span>
+                <span>Ledger</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="divide-y divide-slate-100">
-              {recentTransactions.map((tx) => {
-                const isExpense = tx.type === 'expense';
-                return (
-                  <div key={tx.id} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-slate-900 truncate">
-                        {tx.title}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
-                        <span>{tx.date}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{tx.paymentMethod}</span>
+            {recentTransactions.length === 0 ? (
+              <div className="py-8 px-4 text-center rounded-lg bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700">Ledger is clean</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Ready for your personal entries or CSV import.
+                </p>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Entry</span>
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentTransactions.map((tx) => {
+                  const isExpense = tx.type === 'expense';
+                  return (
+                    <div key={tx.id} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-900 truncate">
+                          {tx.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5">
+                          <span>{tx.date}</span>
+                          <span aria-hidden="true">&middot;</span>
+                          <span>{tx.paymentMethod}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`text-xs font-bold font-tabular ${
+                            isExpense ? 'text-slate-900' : 'text-emerald-600'
+                          }`}
+                        >
+                          {isExpense ? '-' : '+'}
+                          {formatMoney(tx.amount)}
+                        </span>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <span
-                        className={`text-xs font-bold font-tabular ${
-                          isExpense ? 'text-slate-900' : 'text-emerald-600'
-                        }`}
-                      >
-                        {isExpense ? '-' : '+'}
-                        {formatTaka(tx.amount)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Quick AI Advisor Assistant Widget */}
-          <div className="bg-linear-to-br from-emerald-50 via-slate-50 to-white rounded-xl border border-emerald-200/80 p-4 shadow-2xs">
+          {/* AI Advisor Preview Widget */}
+          <div className="bg-gradient-to-br from-emerald-50 via-slate-50 to-white rounded-xl border border-emerald-200/80 p-4 shadow-2xs">
             <div className="flex items-center gap-3">
               <img
                 src={advisorAvatarImg}
@@ -464,10 +517,10 @@ export const OverviewTab: React.FC = () => {
               />
               <div>
                 <h3 className="text-xs font-bold text-slate-900">
-                  {language === 'bn' ? 'ফিনসাথী ব্যক্তিগত পরামর্শক' : 'FinSathi AI Advisor'}
+                  FinSathi AI Advisor
                 </h3>
                 <p className="text-[11px] text-slate-600">
-                  {language === 'bn' ? 'বাংলা বা বাংলিশে আর্থিক প্রশ্ন করুন' : 'Ask any financial question in Bangla'}
+                  Ready for your personal financial questions
                 </p>
               </div>
             </div>
@@ -477,13 +530,13 @@ export const OverviewTab: React.FC = () => {
                 onClick={() => setActiveTab('assistant')}
                 className="text-left px-2.5 py-1.5 text-xs text-slate-700 bg-white hover:bg-emerald-50 border border-slate-200/70 rounded-md transition-colors"
               >
-                &ldquo;এই মাসে খাবারের পেছনে কত খরচ করেছি?&rdquo;
+                &ldquo;How should I plan my monthly budget?&rdquo;
               </button>
               <button
                 onClick={() => setActiveTab('assistant')}
                 className="text-left px-2.5 py-1.5 text-xs text-slate-700 bg-white hover:bg-emerald-50 border border-slate-200/70 rounded-md transition-colors"
               >
-                &ldquo;আমার শপিং বাজেট কি শেষ হয়ে গেছে?&rdquo;
+                &ldquo;Tips on building an emergency reserve fund?&rdquo;
               </button>
             </div>
           </div>

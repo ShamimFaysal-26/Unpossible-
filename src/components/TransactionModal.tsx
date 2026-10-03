@@ -13,14 +13,14 @@ export const TransactionModal: React.FC = () => {
     setEditingTransaction,
     addTransaction,
     updateTransaction,
-    language
+    currency
   } = useFinance();
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [type, setType] = useState<TransactionType>('expense');
-  const [category, setCategory] = useState<TransactionCategory>('Food');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bKash');
+  const [category, setCategory] = useState<TransactionCategory>('Food & Dining');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit Card');
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
   const [isCategorizing, setIsCategorizing] = useState(false);
@@ -41,15 +41,15 @@ export const TransactionModal: React.FC = () => {
       setTitle('');
       setAmount('');
       setType('expense');
-      setCategory('Food');
-      setPaymentMethod('bKash');
+      setCategory('Food & Dining');
+      setPaymentMethod('Credit Card');
       setDate(new Date().toISOString().slice(0, 10));
       setNote('');
       setAiSuggestionReason(null);
     }
   }, [editingTransaction, isAddModalOpen]);
 
-  // Handle AI Auto-categorization trigger
+  // Handle AI Auto-categorization
   const handleAutoCategorize = async () => {
     if (!title.trim()) return;
     setIsCategorizing(true);
@@ -58,7 +58,7 @@ export const TransactionModal: React.FC = () => {
       const res = await categorizeTransactionWithAi(title, Number(amount) || 0, note);
       if (res.category && Object.keys(categoryLabels).includes(res.category)) {
         setCategory(res.category as TransactionCategory);
-        setAiSuggestionReason(language === 'bn' ? res.reasoningBn : res.reasoningEn);
+        setAiSuggestionReason(res.reasoning);
         if (res.typeRecommendation) {
           setType(res.typeRecommendation);
         }
@@ -76,7 +76,7 @@ export const TransactionModal: React.FC = () => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
     if (!title.trim() || isNaN(numAmount) || numAmount <= 0) {
-      alert(language === 'bn' ? 'অনুগ্রহ করে সঠিক শিরোনাম এবং টাকার পরিমাণ লিখুন' : 'Please provide a valid title and amount');
+      alert('Please enter a valid title and positive amount.');
       return;
     }
 
@@ -113,12 +113,10 @@ export const TransactionModal: React.FC = () => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {editingTransaction
-                ? (language === 'bn' ? 'লেনদেন সম্পাদনা' : 'Edit Transaction')
-                : (language === 'bn' ? 'নতুন লেনদেন লিখুন' : 'New Transaction Entry')}
+              {editingTransaction ? 'Edit Transaction' : 'Record New Transaction'}
             </h2>
             <p className="text-xs text-slate-500">
-              {language === 'bn' ? 'বাংলা বা ইংরেজিতে বিস্তারিত লিখুন' : 'Enter amount, type and smart category'}
+              Enter amount, classification, and payment details
             </p>
           </div>
           <button
@@ -137,7 +135,7 @@ export const TransactionModal: React.FC = () => {
           {/* Type Toggle: Expense vs Income */}
           <div>
             <label className="block text-slate-700 font-semibold mb-1.5">
-              {language === 'bn' ? 'লেনদেনের ধরন' : 'Transaction Type'}
+              Transaction Type
             </label>
             <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-lg">
               <button
@@ -149,7 +147,7 @@ export const TransactionModal: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {language === 'bn' ? 'ব্যয় (Expense)' : 'Expense (-)'}
+                Expense (-)
               </button>
               <button
                 type="button"
@@ -160,7 +158,7 @@ export const TransactionModal: React.FC = () => {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {language === 'bn' ? 'আয় (Income)' : 'Income (+)'}
+                Income (+)
               </button>
             </div>
           </div>
@@ -169,7 +167,7 @@ export const TransactionModal: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-slate-700 font-semibold">
-                {language === 'bn' ? 'বিবরণ বা শিরোনাম' : 'Title / Description'} *
+                Title / Merchant Description *
               </label>
               <button
                 type="button"
@@ -180,12 +178,12 @@ export const TransactionModal: React.FC = () => {
                 {isCategorizing ? (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>{language === 'bn' ? 'শ্রেণিবিভাগ হচ্ছে...' : 'Classifying...'}</span>
+                    <span>Analyzing...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-3 h-3 text-emerald-600" />
-                    <span>{language === 'bn' ? 'এআই অটো-ক্যাটাগরি' : 'AI Auto-Classify'}</span>
+                    <span>AI Auto-Classify</span>
                   </>
                 )}
               </button>
@@ -195,11 +193,11 @@ export const TransactionModal: React.FC = () => {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={language === 'bn' ? 'যেমন: চাল ডাল বাজার, পাঠাও রাইড, ডেসকো কারেন্ট বিল' : 'e.g., Grocery shopping, Pathao ride, Electricity bill'}
+              placeholder="e.g., Whole Foods Grocery, Downtown Uber, Electric Bill"
               className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
             />
             {aiSuggestionReason && (
-              <p className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 p-1.5 rounded flex items-center gap-1">
+              <p className="mt-1 text-[11px] text-emerald-800 bg-emerald-50 p-1.5 rounded flex items-center gap-1 border border-emerald-200/60">
                 <Check className="w-3 h-3 text-emerald-600 shrink-0" />
                 <span>{aiSuggestionReason}</span>
               </p>
@@ -210,23 +208,23 @@ export const TransactionModal: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1.5">
-                {language === 'bn' ? 'টাকার পরিমাণ (৳ BDT)' : 'Amount (BDT ৳)'} *
+                Amount ({currency}) *
               </label>
               <input
                 type="number"
                 required
-                min="1"
+                min="0.01"
                 step="any"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
+                placeholder="0.00"
                 className="w-full px-3.5 py-2 text-xs font-tabular font-bold bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
               />
             </div>
 
             <div>
               <label className="block text-slate-700 font-semibold mb-1.5">
-                {language === 'bn' ? 'তারিখ' : 'Date'}
+                Date
               </label>
               <input
                 type="date"
@@ -242,16 +240,16 @@ export const TransactionModal: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-slate-700 font-semibold mb-1.5">
-                {language === 'bn' ? 'ক্যাটাগরি' : 'Category'}
+                Category
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as TransactionCategory)}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-medium"
               >
-                {Object.entries(categoryLabels).map(([catKey, val]) => (
+                {Object.keys(categoryLabels).map((catKey) => (
                   <option key={catKey} value={catKey}>
-                    {language === 'bn' ? val.bn : val.en}
+                    {catKey}
                   </option>
                 ))}
               </select>
@@ -259,38 +257,38 @@ export const TransactionModal: React.FC = () => {
 
             <div>
               <label className="block text-slate-700 font-semibold mb-1.5">
-                {language === 'bn' ? 'পেমেন্ট মেথড' : 'Payment Method'}
+                Payment Channel
               </label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-medium"
               >
-                <option value="bKash">bKash (বিকাশ)</option>
-                <option value="Nagad">Nagad (নগদ)</option>
-                <option value="Rocket">Rocket (রকেট)</option>
-                <option value="Bank Transfer">Bank Transfer (ব্যাংক)</option>
-                <option value="Credit Card">Credit Card (ক্রেডিট কার্ড)</option>
-                <option value="Cash">Cash (নগদ টাকা)</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Debit Card">Debit Card</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Mobile Wallet">Mobile Wallet</option>
+                <option value="PayPal">PayPal</option>
+                <option value="Cash">Cash</option>
               </select>
             </div>
           </div>
 
-          {/* Note / Memo */}
+          {/* Note */}
           <div>
             <label className="block text-slate-700 font-semibold mb-1.5">
-              {language === 'bn' ? 'অতিরিক্ত নোট (ঐচ্ছিক)' : 'Note / Memo (Optional)'}
+              Memo / Notes (Optional)
             </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={language === 'bn' ? 'কোনো বিশেষ তথ্য...' : 'Details, place, bill number...'}
+              placeholder="e.g. Receipt reference, client name, invoice number"
               className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
             />
           </div>
 
-          {/* Modal Footer Actions */}
+          {/* Footer Actions */}
           <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
             <button
               type="button"
@@ -298,17 +296,15 @@ export const TransactionModal: React.FC = () => {
                 setIsAddModalOpen(false);
                 setEditingTransaction(null);
               }}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
             >
-              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+              Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-xs active:scale-95"
+              className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs active:scale-95"
             >
-              {editingTransaction
-                ? (language === 'bn' ? 'সংরক্ষণ করুন' : 'Update')
-                : (language === 'bn' ? 'যোগ করুন' : 'Save Transaction')}
+              {editingTransaction ? 'Save Changes' : 'Record Entry'}
             </button>
           </div>
         </form>

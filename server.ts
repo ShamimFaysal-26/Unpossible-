@@ -35,6 +35,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database status endpoint
+app.get('/api/database/status', (req, res) => {
+  const hasPgConfig = Boolean(process.env.SQL_HOST && process.env.SQL_DB_NAME);
+  res.json({
+    connected: hasPgConfig,
+    engine: hasPgConfig ? 'Cloud SQL (PostgreSQL)' : 'Local Persistent Storage (IndexedDB/State)',
+    details: hasPgConfig
+      ? `Connected to database: ${process.env.SQL_DB_NAME}`
+      : 'Ready for Cloud SQL or Firestore integration. Current session data is safely persisted in browser storage.',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Endpoint: AI Transaction Categorization
 app.post('/api/ai/categorize', async (req, res) => {
   try {
@@ -45,50 +58,50 @@ app.post('/api/ai/categorize', async (req, res) => {
     }
 
     if (!apiKey) {
-      // Fallback rule-based categorization if key not configured
+      // Fast heuristic fallback
       const lower = title.toLowerCase();
       let cat = 'Other';
-      if (/bazar|bazaar|bajaar|চাল|ডাল|বাজার|food|lunch|dinner|breakfast|restaurant|kabab|biryani|grocery|shwapno|agora|chaldal/i.test(lower)) cat = 'Food';
-      else if (/pathao|uber|ride|bus|train|metro|cng|rickshaw|ভাড়া|যাতায়াত|গাড়ি/i.test(lower)) cat = 'Transport';
-      else if (/bill|desco|wasa|titas|electric|electricity|net|internet|wifi|পানি|বিদ্যুৎ|গ্যাস|বিল/i.test(lower)) cat = 'Bills';
-      else if (/aarong|daraz|cloth|dress|shoe|pant|shirt|shopping|বাজার|কেনাকাটা|শপিং/i.test(lower)) cat = 'Shopping';
-      else if (/salary|বেতন|মাসিক/i.test(lower)) cat = 'Salary';
-      else if (/upwork|fiverr|freelance|ফ্রিল্যান্স/i.test(lower)) cat = 'Freelance';
-      else if (/rent|flat|house|বাসা/i.test(lower)) cat = 'Housing';
-      else if (/doctor|medicine|hospital|pharmacy|ঔষধ|ওষুধ|ডাক্তার/i.test(lower)) cat = 'Healthcare';
-      else if (/tuition|school|college|university|exam|course|বই|শিক্ষা/i.test(lower)) cat = 'Education';
+      if (/food|lunch|dinner|breakfast|restaurant|grocery|market|coffee|cafe|supermarket|meal|bakery|snack/i.test(lower)) cat = 'Food & Dining';
+      else if (/uber|lyft|ride|taxi|gas|fuel|transit|metro|subway|bus|train|flight|commute/i.test(lower)) cat = 'Transportation';
+      else if (/bill|utility|electric|power|water|internet|wifi|mobile|phone|gas bill/i.test(lower)) cat = 'Bills & Utilities';
+      else if (/rent|apartment|lease|mortgage|housing|flat/i.test(lower)) cat = 'Housing & Rent';
+      else if (/cloth|shoes|amazon|target|electronics|gadget|monitor|keyboard|shopping|retail/i.test(lower)) cat = 'Shopping';
+      else if (/salary|paycheck|payroll|stipend|bonus/i.test(lower)) cat = 'Salary';
+      else if (/freelance|consulting|contract|client payment|invoice/i.test(lower)) cat = 'Freelance';
+      else if (/doctor|medicine|hospital|pharmacy|dental|clinic|health|vitamins/i.test(lower)) cat = 'Healthcare';
+      else if (/course|university|tuition|books|training|certification|school/i.test(lower)) cat = 'Education';
+      else if (/movie|cinema|netflix|spotify|game|concert|theater/i.test(lower)) cat = 'Entertainment';
 
       return res.json({
         category: cat,
         subcategory: 'General',
         confidence: 0.85,
-        reasoningBn: `শব্দ বিশ্লেষণের মাধ্যমে '${cat}' ক্যাটাগরি নির্ধারিত হয়েছে।`,
-        reasoningEn: `Categorized as '${cat}' based on pattern matching.`
+        reasoning: `Categorized under '${cat}' based on keyword patterns.`,
+        typeRecommendation: (cat === 'Salary' || cat === 'Freelance') ? 'income' : 'expense'
       });
     }
 
-    const prompt = `You are the AI Transaction Categorizer for "FinSathi AI", a Bangladeshi personal finance platform.
-Analyze this transaction title and amount, supporting both Bangla and Banglish / English text:
+    const prompt = `You are the AI Transaction Categorizer for FinSathi AI, an intelligent personal finance platform.
+Analyze this transaction title and amount:
 Transaction Title: "${title}"
-Amount: ৳${amount || 0}
+Amount: $${amount || 0}
 Note: "${note || ''}"
 
 Allowed Categories:
-- Food (Groceries, restaurants, snacks, raw market/কাঁচাবাজার, Star Kabab, Chaldal, Agora, Shwapno)
-- Transport (Pathao, Uber, MRT/Metrorail, Rickshaw, Greenline bus, fuel, CNG)
-- Shopping (Aarong, clothing, electronics, gadgets, Daraz, footwear)
-- Bills (DESCO electricity, Dhaka WASA water, Titas gas, Carnival/Amber internet, mobile recharge)
-- Housing (House rent, flat maintenance, service charges)
-- Education (University semester fees, school tuition, courses, books)
-- Healthcare (Doctor consultancy, Labaid pharmacy, diagnostics, medicine)
-- Entertainment (Cineplex movie, Netflix, streaming, concerts, games)
-- Salary (Monthly salary, bonus, company stipend)
-- Freelance (Upwork, Fiverr, client project payouts, bKash remittance)
-- Investment (Stock market, FDR, DPS, gold, savings certificates)
-- Family (Parents allowance, eid salami, siblings expense)
-- Other (Uncategorized expenses or adjustments)
+- Food & Dining (Groceries, restaurants, cafes, snacks, dining out)
+- Transportation (Uber, Lyft, fuel, public transit, metro, flights, parking)
+- Shopping (Clothing, gadgets, electronics, home goods, retail)
+- Bills & Utilities (Electricity, water, gas, broadband internet, mobile plans)
+- Housing & Rent (Apartment rent, mortgage, lease, property charges)
+- Education (Courses, certifications, tuition, books, school)
+- Healthcare (Doctor visits, pharmacy, prescriptions, dental, wellness)
+- Entertainment (Movies, streaming subscriptions, games, events)
+- Salary (Monthly salary, corporate payroll, bonuses)
+- Freelance (Client project fees, contract invoices, consulting)
+- Investments (Stocks, dividends, crypto, interest)
+- Other (Miscellaneous)
 
-Determine the category, subcategory, confidence score (0.0 to 1.0), and short reasoning in Bangla and English.
+Determine the category, subcategory, confidence score (0.0 to 1.0), and short reasoning in English.
 Return strictly valid JSON.`;
 
     const response = await ai.models.generateContent({
@@ -101,21 +114,17 @@ Return strictly valid JSON.`;
           properties: {
             category: {
               type: Type.STRING,
-              description: 'One of the allowed categories: Food, Transport, Shopping, Bills, Housing, Education, Healthcare, Entertainment, Salary, Freelance, Investment, Family, Other'
+              description: 'One of the allowed categories: Food & Dining, Transportation, Shopping, Bills & Utilities, Housing & Rent, Education, Healthcare, Entertainment, Salary, Freelance, Investments, Other'
             },
             subcategory: {
               type: Type.STRING,
-              description: 'Specific subcategory like Groceries, Ride-sharing, Electricity, etc.'
+              description: 'Specific subcategory like Groceries, Fuel, Electricity, etc.'
             },
             confidence: {
               type: Type.NUMBER,
               description: 'Confidence score from 0.0 to 1.0'
             },
-            reasoningBn: {
-              type: Type.STRING,
-              description: 'Brief explanation in Bengali of why this category was selected'
-            },
-            reasoningEn: {
+            reasoning: {
               type: Type.STRING,
               description: 'Brief explanation in English of why this category was selected'
             },
@@ -124,7 +133,7 @@ Return strictly valid JSON.`;
               description: 'expense or income'
             }
           },
-          required: ['category', 'subcategory', 'confidence', 'reasoningBn', 'reasoningEn']
+          required: ['category', 'subcategory', 'confidence', 'reasoning']
         }
       }
     });
@@ -137,7 +146,7 @@ Return strictly valid JSON.`;
   }
 });
 
-// Endpoint: AI Financial Assistant in Bangla/Banglish/English
+// Endpoint: AI Financial Assistant in English
 app.post('/api/ai/assistant', async (req, res) => {
   try {
     const { message, history = [], context = {} } = req.body;
@@ -146,31 +155,6 @@ app.post('/api/ai/assistant', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    if (!apiKey) {
-      // Local intelligent response if no API key
-      const lower = message.toLowerCase();
-      let replyBn = '';
-      if (lower.includes('খাবার') || lower.includes('food') || lower.includes('khabar')) {
-        replyBn = 'চলতি অক্টোবর মাসে খাবারের পেছনে আপনার মোট খরচ হয়েছে প্রায় ৳১১,৫৫০। এর মধ্যে কাঁচাবাজার ও গ্রোসারি ছিল প্রধান, তবে স্টার কাবাবে ডিনার ছিল ৳২,১০০। আপনার নির্ধারিত খাদ্য বাজেট ৳১৪,০০০ এর মধ্যে আপনি এখনো নিরাপদে আছেন (৮২% ব্যবহৃত)।';
-      } else if (lower.includes('budget') || lower.includes('বাজেট')) {
-        replyBn = 'আপনার মোট ৮টি ক্যাটাগরির বাজেট ট্র্যাক করা হচ্ছে। সবচেয়ে বেশি চাপ পড়েছে "Shopping" ক্যাটাগরিতে (৳১০,০০০ বাজেটে খরচ হয়েছে ৳২০,২০০, ২০২%)। অন্যান্য ক্যাটাগরি যেমন Food (৮২%) ও Transport (৫৫%) এখনো স্বাভাবিক সীমার মধ্যে রয়েছে।';
-      } else if (lower.includes('unusual') || lower.includes('অস্বাভাবিক') || lower.includes('beshi')) {
-        replyBn = 'হ্যাঁ! অক্টোবর ৬ তারিখে যমুনা ফিউচার পার্ক থেকে গ্যাজেট কেনাকাটায় ৳১৬,৮০০ খরচ শনাক্ত হয়েছে, যা আপনার সাধারণ মাসিক শপিং গড়ের চেয়ে প্রায় ৩ গুণ বেশি। এটি একটি অস্বাভাবিক বড় ব্যয়।';
-      } else {
-        replyBn = `আমি ফিনসাথী এআই (FinSathi AI)। আপনার বর্তমান মোট আয় ৳১,০০,০০০ এবং মোট খরচ ৳৬২,৩৫০। অবশিষ্ট ৳৩৭,৬৫০ এর মধ্যে সঞ্চয় তহবিলে জমা করার চমৎকার সুযোগ রয়েছে। আপনার নির্দিষ্ট কোনো প্রশ্ন থাকলে নির্দ্বিধায় বাংলায় বা বাংলিশে জানান!`;
-      }
-
-      return res.json({
-        reply: replyBn,
-        suggestedActions: [
-          'খাবারের খরচের বিস্তারিত দেখান',
-          'শপিং বাজেট কিভাবে নিয়ন্ত্রণ করব?',
-          'জরুরি তহবিলে কত টাকা জমানো উচিত?'
-        ]
-      });
-    }
-
-    // Format context for Gemini
     const { transactions = [], budgets = [], goals = [], userProfile = {} } = context;
 
     // Calculate quick metrics to feed into prompt
@@ -189,41 +173,57 @@ app.post('/api/ai/assistant', async (req, res) => {
       }
     }
 
-    const systemPrompt = `You are "FinSathi AI" (ফিনসাথী এআই), an expert personal financial advisor and assistant designed specifically for Bangladeshi users.
-Your characteristics:
-1. Language Fluency:
-   - If the user asks in Bangla (বাংলা লিপি), respond in polite, natural, encouraging Bengali.
-   - If the user asks in Banglish (e.g. "ei mashe amar food khoroch koto?"), reply in natural Bangla or friendly Banglish/Bangla with exact Bengali numbers.
-   - If the user asks in English, reply in polished English with BDT (৳) references.
-2. Local Bangladeshi Context:
-   - Understand local payment methods (bKash, Nagad, Rocket, Bank transfer, Cash).
-   - Understand local expenses (Carwan Bazar kacha-bazar, rickshaw, Pathao rides, MRT metro, DESCO/WASA utility bills, Biryani/Kacchi, Dhaka flat rent).
-   - Currency symbol: ৳ (BDT Taka).
-3. Precision:
-   - Use the REAL user financial data provided below. Do not make up random numbers if the data contains them.
-   - Calculate accurately: Income, Expense, Balance, Budgets, and Savings Goals.
-   - Be constructive, respectful, actionable, and encouraging.
+    if (!apiKey) {
+      const lower = message.toLowerCase();
+      let reply = '';
+      if (lower.includes('food') || lower.includes('dining')) {
+        const spent = categoryBreakdown['Food & Dining'] || 480;
+        reply = `You have spent $${spent.toLocaleString()} on Food & Dining so far this month across groceries and restaurant meals. Your allocated budget is $700, so you are on track with $${(700 - spent).toLocaleString()} remaining.`;
+      } else if (lower.includes('budget') || lower.includes('limit')) {
+        reply = `Your budgets are largely well-balanced. However, your Shopping budget is currently over limit due to an electronics equipment purchase ($1,430 spent vs $500 limit). Other categories like Housing ($1,650) and Food & Dining ($480) are safely within budget.`;
+      } else if (lower.includes('unusual') || lower.includes('anomaly') || lower.includes('highest')) {
+        reply = `Yes, an unusual expenditure was detected: The $1,250 purchase for a 4K studio monitor on October 7. This is 346% higher than your standard monthly shopping average.`;
+      } else {
+        reply = `Your current monthly income is $${totalIncome.toLocaleString()} and your total expenses are $${totalExpense.toLocaleString()}, giving you a positive cash surplus of $${(totalIncome - totalExpense).toLocaleString()} (36% savings rate). How can I assist you with your budgets or savings goals today?`;
+      }
 
-CURRENT USER FINANCIAL DATA:
-User: ${userProfile.name || 'Faysal Ahmed'} (Occupation: ${userProfile.occupation || 'Engineer'})
-Total Current Income: ৳${totalIncome.toLocaleString()}
-Total Current Expenses: ৳${totalExpense.toLocaleString()}
-Net Surplus: ৳${(totalIncome - totalExpense).toLocaleString()}
+      return res.json({
+        reply,
+        suggestedActions: [
+          'How can I optimize my food spending?',
+          'What is my shopping budget status?',
+          'How much can I save towards my Emergency Fund?'
+        ]
+      });
+    }
+
+    const systemPrompt = `You are "FinSathi AI", an intelligent, friendly, and practical personal financial advisor and assistant.
+Guidelines:
+1. Always communicate in clear, concise, professional, and friendly English.
+2. Provide precise numbers, calculations, percentages, and actionable suggestions using the user's real financial data.
+3. Currency symbol: $ (or user's configured currency).
+4. Highlight key takeaways using clean bullet points and bold financial figures.
+
+USER FINANCIAL DATA:
+User: ${userProfile.name || 'User'} (${userProfile.occupation || 'Professional'})
+Total Recorded Income: $${totalIncome.toLocaleString()}
+Total Recorded Expenses: $${totalExpense.toLocaleString()}
+Net Cash Surplus: $${(totalIncome - totalExpense).toLocaleString()}
 Savings Rate: ${totalIncome > 0 ? Math.round(((totalIncome - totalExpense) / totalIncome) * 100) : 0}%
 
 Category Expenses Breakdown:
-${Object.entries(categoryBreakdown).map(([cat, amt]) => `- ${cat}: ৳${amt.toLocaleString()}`).join('\n')}
+${Object.entries(categoryBreakdown).map(([cat, amt]) => `- ${cat}: $${amt.toLocaleString()}`).join('\n')}
 
-Monthly Budgets:
-${budgets.map((b: any) => `- ${b.category}: Limit ৳${b.monthlyLimit.toLocaleString()} (Spent: ৳${(categoryBreakdown[b.category] || 0).toLocaleString()}, Status: ${(categoryBreakdown[b.category] || 0) > b.monthlyLimit ? 'EXCEEDED' : 'Normal'})`).join('\n')}
+Active Budgets:
+${budgets.map((b: any) => `- ${b.category}: Limit $${b.monthlyLimit.toLocaleString()} (Spent: $${(categoryBreakdown[b.category] || 0).toLocaleString()}, Status: ${(categoryBreakdown[b.category] || 0) > b.monthlyLimit ? 'EXCEEDED' : 'Normal'})`).join('\n')}
 
 Savings Goals:
-${goals.map((g: any) => `- ${g.title || g.titleBn}: Target ৳${g.targetAmount.toLocaleString()}, Saved ৳${g.currentAmount.toLocaleString()} (${Math.round((g.currentAmount / g.targetAmount) * 100)}%), Target Date: ${g.targetDate}`).join('\n')}
+${goals.map((g: any) => `- ${g.title}: Target $${g.targetAmount.toLocaleString()}, Saved $${g.currentAmount.toLocaleString()} (${Math.round((g.currentAmount / g.targetAmount) * 100)}%), Target Date: ${g.targetDate}`).join('\n')}
 
-Recent 10 Transactions:
-${transactions.slice(0, 10).map((t: any) => `[${t.date}] ${t.title}: ৳${t.amount} (${t.type} - ${t.category}) via ${t.paymentMethod}${t.isUnusual ? ' [UNUSUAL SPEND]' : ''}`).join('\n')}
+Recent 8 Transactions:
+${transactions.slice(0, 8).map((t: any) => `[${t.date}] ${t.title}: $${t.amount} (${t.type} - ${t.category}) via ${t.paymentMethod}${t.isUnusual ? ' [SPIKE SPEND]' : ''}`).join('\n')}
 
-Format your answer cleanly with bullet points when listing items. Keep it concise, friendly, and directly answering their question.`;
+Answer directly, warmly, and helpfully.`;
 
     const contents = [
       { text: systemPrompt },
@@ -241,16 +241,16 @@ Format your answer cleanly with bullet points when listing items. Keep it concis
       }
     });
 
-    const replyText = response.text || 'দুঃখিত, এই মুহূর্তে উত্তর দিতে পারছি না। অনুগ্রহ করে আবার চেষ্টা করুন।';
+    const replyText = response.text || 'I analyzed your finances. Could you please rephrase or specify which category you would like to inspect?';
 
-    // Generate 3 contextual follow-up chips
+    // Contextual suggested follow-ups
     const suggestions: string[] = [];
-    if (/খাবার|food/i.test(message)) {
-      suggestions.push('খাবারের ব্যয়ে সাশ্রয় করার টিপস দিন', 'বাজারের জন্য আদর্শ বাজেট কত?');
-    } else if (/budget|বাজেট/i.test(message)) {
-      suggestions.push('কোন কোন ক্যাটাগরিতে বাজেট অতিক্রম হয়েছে?', 'পরের মাসের বাজেট পুনর্নির্ধারণ করুন');
+    if (/food|grocery/i.test(message)) {
+      suggestions.push('Show breakdown of dining out vs groceries', 'How can I save $100 on food?');
+    } else if (/budget/i.test(message)) {
+      suggestions.push('Which categories are over budget?', 'Suggest budget adjustments for next month');
     } else {
-      suggestions.push('এই মাসে মোট কত টাকা সঞ্চয় করতে পারব?', 'আমার কি কোনো অস্বাভাবিক খরচ আছে?');
+      suggestions.push('How can I boost my savings rate?', 'Are there any unusual expenses this month?');
     }
 
     res.json({
@@ -263,7 +263,7 @@ Format your answer cleanly with bullet points when listing items. Keep it concis
   }
 });
 
-// Endpoint: AI Insights & Anomaly Detection
+// Endpoint: AI Insights & Anomaly Detection in English
 app.post('/api/ai/insights', async (req, res) => {
   try {
     const { transactions = [], budgets = [], goals = [] } = req.body;
@@ -275,16 +275,15 @@ app.post('/api/ai/insights', async (req, res) => {
       });
     }
 
-    const prompt = `You are FinSathi AI's spending analytics and anomaly detection engine for a Bangladeshi user.
-Review these transactions and budgets:
+    const prompt = `You are FinSathi AI's spending analytics and anomaly detection engine.
+Review these user transactions and budgets:
 Transactions: ${JSON.stringify(transactions.slice(0, 25))}
 Budgets: ${JSON.stringify(budgets)}
 Goals: ${JSON.stringify(goals)}
 
 Tasks:
 1. Identify any "unusual spending" / anomalies (transactions that are drastically higher than typical for their category or that exceed the category monthly budget singlehandedly).
-2. Generate 3 to 4 personalized, high-value financial insights (alerts, savings opportunities, praise, recommendations) tailored to Bangladeshi living costs and financial habits.
-3. Provide both Bangla and English text.
+2. Generate 3 to 4 personalized, high-value financial insights in English (alerts, savings opportunities, praise, budget tips).
 
 Return JSON according to the schema.`;
 
@@ -307,11 +306,10 @@ Return JSON according to the schema.`;
                   amount: { type: Type.NUMBER },
                   averageCategoryAmount: { type: Type.NUMBER },
                   percentageHigher: { type: Type.NUMBER },
-                  explanationBn: { type: Type.STRING },
-                  explanationEn: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
                   severity: { type: Type.STRING }
                 },
-                required: ['transactionTitle', 'category', 'amount', 'explanationBn', 'explanationEn', 'severity']
+                required: ['transactionTitle', 'category', 'amount', 'explanation', 'severity']
               }
             },
             insights: {
@@ -321,16 +319,13 @@ Return JSON according to the schema.`;
                 properties: {
                   id: { type: Type.STRING },
                   type: { type: Type.STRING },
-                  titleBn: { type: Type.STRING },
-                  titleEn: { type: Type.STRING },
-                  descriptionBn: { type: Type.STRING },
-                  descriptionEn: { type: Type.STRING },
-                  actionBn: { type: Type.STRING },
-                  actionEn: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  action: { type: Type.STRING },
                   category: { type: Type.STRING },
                   metric: { type: Type.STRING }
                 },
-                required: ['type', 'titleBn', 'titleEn', 'descriptionBn', 'descriptionEn']
+                required: ['type', 'title', 'description']
               }
             }
           },

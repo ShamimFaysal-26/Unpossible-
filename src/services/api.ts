@@ -4,8 +4,7 @@ export interface CategorizeResult {
   category: string;
   subcategory: string;
   confidence: number;
-  reasoningBn: string;
-  reasoningEn: string;
+  reasoning: string;
   typeRecommendation?: 'expense' | 'income';
 }
 
@@ -38,13 +37,11 @@ export async function categorizeTransactionWithAi(
     return await res.json();
   } catch (error) {
     console.error('API categorization error:', error);
-    // Smart fallback
     return {
-      category: 'Food',
+      category: 'Food & Dining',
       subcategory: 'General',
       confidence: 0.7,
-      reasoningBn: 'ডিফল্ট ক্যাটাগরি নির্ধারিত হয়েছে',
-      reasoningEn: 'Default category assigned'
+      reasoning: 'Default category assigned'
     };
   }
 }
@@ -74,8 +71,8 @@ export async function askAiAssistant(
   } catch (error) {
     console.error('API assistant error:', error);
     return {
-      reply: 'দুঃখিত, সংযোগে কিছুটা বিলম্ব হচ্ছে। অনুগ্রহ করে আপনার ইন্টারনেট সংযোগ পরীক্ষা করে পুনরায় প্রশ্ন করুন।',
-      suggestedActions: ['আমার খাদ্য বাজেট কত?', 'এই মাসের মোট আয়-ব্যয় দেখাও']
+      reply: 'I am experiencing a temporary connection delay. Please ensure network connectivity and ask again.',
+      suggestedActions: ['What is my Food & Dining budget status?', 'Summarize this month cash flow']
     };
   }
 }
@@ -104,4 +101,20 @@ export async function fetchAiInsights(
       anomalyReports: []
     };
   }
+}
+
+export async function checkDatabaseStatus(): Promise<{ connected: boolean; engine: string; details: string }> {
+  try {
+    const res = await fetch('/api/database/status');
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Database status check failed', e);
+  }
+  return {
+    connected: false,
+    engine: 'Local Persistent Storage',
+    details: 'Browser state active'
+  };
 }

@@ -1,32 +1,31 @@
 export type TransactionType = 'income' | 'expense';
 
 export type TransactionCategory =
-  | 'Food'
-  | 'Transport'
+  | 'Food & Dining'
+  | 'Transportation'
   | 'Shopping'
-  | 'Bills'
+  | 'Bills & Utilities'
+  | 'Housing & Rent'
   | 'Education'
   | 'Healthcare'
   | 'Entertainment'
-  | 'Housing'
   | 'Salary'
   | 'Freelance'
-  | 'Investment'
-  | 'Family'
+  | 'Investments'
   | 'Other';
 
 export type PaymentMethod =
-  | 'bKash'
-  | 'Nagad'
-  | 'Rocket'
+  | 'Credit Card'
+  | 'Debit Card'
   | 'Bank Transfer'
   | 'Cash'
-  | 'Credit Card';
+  | 'Mobile Wallet'
+  | 'PayPal';
 
 export interface Transaction {
   id: string;
   title: string;
-  amount: number; // in BDT (৳)
+  amount: number;
   type: TransactionType;
   category: TransactionCategory;
   subcategory?: string;
@@ -40,31 +39,27 @@ export interface Transaction {
 export interface Budget {
   id: string;
   category: TransactionCategory;
-  monthlyLimit: number; // BDT
+  monthlyLimit: number;
   month: string; // YYYY-MM
 }
 
 export interface SavingsGoal {
   id: string;
   title: string;
-  titleBn?: string;
-  targetAmount: number; // BDT
-  currentAmount: number; // BDT
+  targetAmount: number;
+  currentAmount: number;
   targetDate: string; // YYYY-MM-DD
   category: string;
   aiRecommendation?: string;
-  aiRecommendationBn?: string;
 }
 
 export interface UserProfile {
   id: string;
   name: string;
-  nameBn: string;
   email: string;
   occupation: string;
   monthlyIncome: number;
   currency: string;
-  language: 'bn' | 'en';
 }
 
 export interface AiChatMessage {
@@ -72,7 +67,6 @@ export interface AiChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
-  language?: 'bn' | 'banglish' | 'en';
   quickActions?: string[];
   suggestedAction?: {
     type: 'add_transaction' | 'adjust_budget' | 'view_goal';
@@ -87,20 +81,24 @@ export interface AnomalyReport {
   amount: number;
   averageCategoryAmount: number;
   percentageHigher: number;
-  explanationBn: string;
-  explanationEn: string;
+  explanation: string;
   severity: 'low' | 'medium' | 'high';
 }
 
 export interface FinancialInsight {
   id: string;
   type: 'alert' | 'tip' | 'praise' | 'prediction';
-  titleBn: string;
-  titleEn: string;
-  descriptionBn: string;
-  descriptionEn: string;
-  actionBn?: string;
-  actionEn?: string;
+  title: string;
+  description: string;
+  action?: string;
   category?: TransactionCategory;
   metric?: string;
+}
+
+export interface DatabaseConfig {
+  type: 'cloudsql_postgres' | 'firebase_firestore' | 'browser_indexeddb';
+  status: 'connected' | 'setup_required' | 'local_active';
+  host?: string;
+  database?: string;
+  lastSyncedAt?: string;
 }

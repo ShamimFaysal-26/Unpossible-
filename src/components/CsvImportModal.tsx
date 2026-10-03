@@ -5,28 +5,25 @@ import { sampleCsvData } from '../data/initialData';
 import { Transaction, TransactionCategory, PaymentMethod, TransactionType } from '../types/finance';
 
 export const CsvImportModal: React.FC = () => {
-  const { isImportModalOpen, setIsImportModalOpen, importTransactionsFromCsv, language } = useFinance();
+  const { isImportModalOpen, setIsImportModalOpen, importTransactionsFromCsv, formatMoney } = useFinance();
   const [csvText, setCsvText] = useState('');
   const [parsedRows, setParsedRows] = useState<Omit<Transaction, 'id'>[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isImportModalOpen) return null;
 
-  // Parse CSV string
   const handleParse = (text: string) => {
     try {
       setErrorMessage(null);
       const lines = text.trim().split('\n').filter(l => l.trim().length > 0);
       if (lines.length < 2) {
-        setErrorMessage(language === 'bn' ? 'সিএসভি ফাইলে কমপক্ষে হেডার ও একটি রেকর্ড থাকতে হবে' : 'CSV must contain a header and at least one row.');
+        setErrorMessage('CSV file must contain a header row and at least one transaction row.');
         setParsedRows([]);
         return;
       }
 
       const rows: Omit<Transaction, 'id'>[] = [];
-      // Skip header line
       for (let i = 1; i < lines.length; i++) {
-        // Handle comma separation
         const parts = lines[i].split(',').map(s => s.trim().replace(/^"|"$/g, ''));
         if (parts.length >= 3) {
           const date = parts[0] || new Date().toISOString().slice(0, 10);
@@ -34,7 +31,7 @@ export const CsvImportModal: React.FC = () => {
           const amount = parseFloat(parts[2]) || 0;
           const type = (parts[3]?.toLowerCase() === 'income' ? 'income' : 'expense') as TransactionType;
           const category = (parts[4] || 'Other') as TransactionCategory;
-          const paymentMethod = (parts[5] || 'Cash') as PaymentMethod;
+          const paymentMethod = (parts[5] || 'Credit Card') as PaymentMethod;
           const note = parts[6] || '';
 
           if (amount > 0) {
@@ -52,7 +49,7 @@ export const CsvImportModal: React.FC = () => {
       }
 
       if (rows.length === 0) {
-        setErrorMessage(language === 'bn' ? 'কোনো বৈধ লেনদেন পাওয়া যায়নি। অনুগ্রহ করে ফরম্যাট যাচাই করুন।' : 'No valid transaction rows found. Check column format.');
+        setErrorMessage('No valid transaction rows found. Please check column format.');
       } else {
         setParsedRows(rows);
       }
@@ -93,7 +90,7 @@ export const CsvImportModal: React.FC = () => {
   const handleImportSubmit = () => {
     if (parsedRows.length === 0) return;
     const count = importTransactionsFromCsv(parsedRows);
-    alert(language === 'bn' ? `সফলভাবে ${count}টি লেনদেন যোগ করা হয়েছে!` : `Successfully imported ${count} transactions!`);
+    alert(`Successfully imported ${count} transactions into your ledger!`);
     setIsImportModalOpen(false);
     setParsedRows([]);
     setCsvText('');
@@ -106,10 +103,10 @@ export const CsvImportModal: React.FC = () => {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {language === 'bn' ? 'সিএসভি ফাইল থেকে লেনদেন ইম্পোর্ট' : 'Import Transactions from CSV'}
+              Import Transactions via CSV
             </h2>
             <p className="text-xs text-slate-500">
-              {language === 'bn' ? 'একসাথে একাধিক আয় ও ব্যয়ের হিসাব যুক্ত করুন' : 'Bulk upload transaction history easily'}
+              Bulk upload transaction history from bank exports or spreadsheets
             </p>
           </div>
           <button
@@ -127,7 +124,7 @@ export const CsvImportModal: React.FC = () => {
             <div className="flex items-center gap-2">
               <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:border-emerald-500 text-slate-800 font-semibold rounded-lg shadow-2xs hover:bg-slate-50 transition-colors">
                 <UploadCloud className="w-4 h-4 text-emerald-600" />
-                <span>{language === 'bn' ? 'ফাইল সিলেক্ট করুন (.csv)' : 'Choose CSV File'}</span>
+                <span>Upload CSV File</span>
                 <input
                   type="file"
                   accept=".csv,text/csv"
@@ -141,24 +138,24 @@ export const CsvImportModal: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-slate-900 rounded-lg transition-colors shadow-2xs"
               >
                 <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{language === 'bn' ? 'নমুনা ডেটা লোড করুন' : 'Load Sample Data'}</span>
+                <span>Load Sample Data</span>
               </button>
             </div>
 
             <button
               type="button"
               onClick={handleDownloadSample}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 hover:underline"
+              className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 hover:underline"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{language === 'bn' ? 'নমুনা সিএসভি ডাউনলোড' : 'Download Template'}</span>
+              <span>Download Template</span>
             </button>
           </div>
 
           {/* Paste or view text */}
           <div>
             <label className="block text-slate-700 font-semibold mb-1">
-              {language === 'bn' ? 'অথবা সরাসরি সিএসভি টেক্সট পেস্ট করুন:' : 'Or paste raw CSV text directly:'}
+              Or paste raw CSV text directly:
             </label>
             <textarea
               rows={4}
@@ -167,7 +164,7 @@ export const CsvImportModal: React.FC = () => {
                 setCsvText(e.target.value);
                 handleParse(e.target.value);
               }}
-              placeholder="Date,Title,Amount,Type,Category,PaymentMethod,Note&#10;2026-10-01,Salary,75000,income,Salary,Bank Transfer,..."
+              placeholder="Date,Title,Amount,Type,Category,PaymentMethod,Note&#10;2026-10-01,Salary,5200,income,Salary,Bank Transfer,..."
               className="w-full p-2.5 font-tabular text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
             />
           </div>
@@ -184,26 +181,24 @@ export const CsvImportModal: React.FC = () => {
           {parsedRows.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600" />
-                  {language === 'bn'
-                    ? `শনাক্তকৃত লেনদেন: ${parsedRows.length}টি`
-                    : `Parsed Records: ${parsedRows.length}`}
+                  Parsed Records: {parsedRows.length}
                 </span>
                 <span className="text-slate-400">
-                  {language === 'bn' ? 'ইম্পোর্টের পূর্বে প্রিভিউ দেখুন' : 'Preview before importing'}
+                  Verify before committing to ledger
                 </span>
               </div>
 
               <div className="border border-slate-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
                 <table className="w-full text-left border-collapse text-[11px]">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 sticky top-0 font-medium">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 sticky top-0 font-semibold">
                     <tr>
                       <th className="py-2 px-3">Date</th>
                       <th className="py-2 px-3">Title</th>
                       <th className="py-2 px-3">Category</th>
                       <th className="py-2 px-3">Type</th>
-                      <th className="py-2 px-3 text-right">Amount (৳)</th>
+                      <th className="py-2 px-3 text-right">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -218,7 +213,7 @@ export const CsvImportModal: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-1.5 px-3 text-right font-tabular font-bold text-slate-900">
-                          ৳{r.amount.toLocaleString()}
+                          {formatMoney(r.amount)}
                         </td>
                       </tr>
                     ))}
@@ -234,17 +229,17 @@ export const CsvImportModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsImportModalOpen(false)}
-            className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg transition-colors"
           >
-            {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            Cancel
           </button>
           <button
             type="button"
             disabled={parsedRows.length === 0}
             onClick={handleImportSubmit}
-            className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors shadow-xs active:scale-95"
+            className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-colors shadow-2xs active:scale-95"
           >
-            {language === 'bn' ? `ইম্পোর্ট সম্পন্ন করুন (${parsedRows.length})` : `Confirm Import (${parsedRows.length})`}
+            Confirm Import ({parsedRows.length} Rows)
           </button>
         </div>
       </div>

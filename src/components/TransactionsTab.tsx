@@ -5,7 +5,6 @@ import {
   Plus,
   UploadCloud,
   Download,
-  Filter,
   Edit2,
   Trash2,
   AlertTriangle,
@@ -16,13 +15,12 @@ import {
   Banknote
 } from 'lucide-react';
 import { categoryLabels } from '../data/initialData';
-import { Transaction, TransactionCategory, PaymentMethod } from '../types/finance';
+import { PaymentMethod } from '../types/finance';
 
 export const TransactionsTab: React.FC = () => {
   const {
     transactions,
-    language,
-    formatTaka,
+    formatMoney,
     deleteTransaction,
     setEditingTransaction,
     setIsAddModalOpen,
@@ -39,7 +37,6 @@ export const TransactionsTab: React.FC = () => {
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter((t) => {
-        // Search
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch =
           !searchTerm ||
@@ -47,13 +44,8 @@ export const TransactionsTab: React.FC = () => {
           (t.note && t.note.toLowerCase().includes(searchLower)) ||
           (t.subcategory && t.subcategory.toLowerCase().includes(searchLower));
 
-        // Category
         const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
-
-        // Type
         const matchesType = selectedType === 'all' || t.type === selectedType;
-
-        // Payment
         const matchesPayment = selectedPayment === 'all' || t.paymentMethod === selectedPayment;
 
         return matchesSearch && matchesCategory && matchesType && matchesPayment;
@@ -65,7 +57,6 @@ export const TransactionsTab: React.FC = () => {
       });
   }, [transactions, searchTerm, selectedCategory, selectedType, selectedPayment, sortOrder]);
 
-  // Export current list to CSV
   const handleExportCsv = () => {
     const headers = ['Date', 'Title', 'Amount', 'Type', 'Category', 'PaymentMethod', 'Note'];
     const rows = filteredTransactions.map((t) => [
@@ -73,7 +64,7 @@ export const TransactionsTab: React.FC = () => {
       `"${t.title.replace(/"/g, '""')}"`,
       t.amount,
       t.type,
-      t.category,
+      `"${t.category}"`,
       t.paymentMethod,
       `"${(t.note || '').replace(/"/g, '""')}"`
     ]);
@@ -89,12 +80,12 @@ export const TransactionsTab: React.FC = () => {
   };
 
   const paymentIcons: Record<PaymentMethod, React.ReactNode> = {
-    bKash: <Smartphone className="w-3.5 h-3.5 text-pink-600" />,
-    Nagad: <Smartphone className="w-3.5 h-3.5 text-amber-600" />,
-    Rocket: <Smartphone className="w-3.5 h-3.5 text-purple-600" />,
-    'Bank Transfer': <Building className="w-3.5 h-3.5 text-blue-600" />,
     'Credit Card': <CreditCard className="w-3.5 h-3.5 text-slate-700" />,
-    Cash: <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+    'Debit Card': <CreditCard className="w-3.5 h-3.5 text-blue-600" />,
+    'Bank Transfer': <Building className="w-3.5 h-3.5 text-emerald-600" />,
+    'Mobile Wallet': <Smartphone className="w-3.5 h-3.5 text-pink-600" />,
+    PayPal: <Smartphone className="w-3.5 h-3.5 text-indigo-600" />,
+    Cash: <Banknote className="w-3.5 h-3.5 text-amber-600" />
   };
 
   return (
@@ -103,31 +94,29 @@ export const TransactionsTab: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            {language === 'bn' ? 'আয় ও ব্যয় লেনদেন খতিয়ান' : 'Transaction Ledger'}
+            Transaction Ledger
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {language === 'bn'
-              ? `মোট ${transactions.length}টি লেনদেন সংরক্ষিত রয়েছে`
-              : `Total ${transactions.length} recorded transactions`}
+            {filteredTransactions.length} matching transactions ({transactions.length} total recorded)
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleExportCsv}
-            title={language === 'bn' ? 'সিএসভি ডাউনলোড করুন' : 'Export to CSV'}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white border border-slate-200/80 rounded-md transition-colors shadow-2xs hover:bg-slate-50"
+            title="Download records as CSV"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200/80 rounded-lg transition-colors shadow-2xs hover:bg-slate-50"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span>{language === 'bn' ? 'এক্সপোর্ট সিএসভি' : 'Export CSV'}</span>
+            <span>Export CSV</span>
           </button>
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white border border-slate-200/80 rounded-md transition-colors shadow-2xs hover:bg-slate-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white border border-slate-200/80 rounded-lg transition-colors shadow-2xs hover:bg-slate-50"
           >
             <UploadCloud className="w-3.5 h-3.5 text-slate-500" />
-            <span>{language === 'bn' ? 'সিএসভি ইম্পোর্ট' : 'Import CSV'}</span>
+            <span>Import CSV</span>
           </button>
 
           <button
@@ -135,10 +124,10 @@ export const TransactionsTab: React.FC = () => {
               setEditingTransaction(null);
               setIsAddModalOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors shadow-xs active:scale-[0.98]"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-2xs active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{language === 'bn' ? 'নতুন লেনদেন লিখুন' : 'New Transaction'}</span>
+            <span>Add Transaction</span>
           </button>
         </div>
       </div>
@@ -153,7 +142,7 @@ export const TransactionsTab: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={language === 'bn' ? 'বিবরণ, নোট বা ট্যাগ দিয়ে খুঁজুন...' : 'Search title, note or subcategory...'}
+              placeholder="Search by title, note, or subcategory..."
               className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-slate-50/70 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white"
             />
           </div>
@@ -162,33 +151,33 @@ export const TransactionsTab: React.FC = () => {
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg shrink-0 self-start sm:self-auto">
             <button
               onClick={() => setSelectedType('all')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 selectedType === 'all'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {language === 'bn' ? 'সকল' : 'All'}
+              All
             </button>
             <button
               onClick={() => setSelectedType('expense')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 selectedType === 'expense'
-                  ? 'bg-white text-rose-700 shadow-2xs font-semibold'
+                  ? 'bg-white text-rose-700 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {language === 'bn' ? 'ব্যয়' : 'Expense'}
+              Expenses
             </button>
             <button
               onClick={() => setSelectedType('income')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                 selectedType === 'income'
-                  ? 'bg-white text-emerald-700 shadow-2xs font-semibold'
+                  ? 'bg-white text-emerald-700 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {language === 'bn' ? 'আয়' : 'Income'}
+              Income
             </button>
           </div>
 
@@ -196,12 +185,12 @@ export const TransactionsTab: React.FC = () => {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full sm:w-auto px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full sm:w-auto px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
           >
-            <option value="all">{language === 'bn' ? 'সকল ক্যাটাগরি' : 'All Categories'}</option>
-            {Object.entries(categoryLabels).map(([catKey, val]) => (
+            <option value="all">All Categories</option>
+            {Object.keys(categoryLabels).map((catKey) => (
               <option key={catKey} value={catKey}>
-                {language === 'bn' ? val.bn : val.en}
+                {catKey}
               </option>
             ))}
           </select>
@@ -210,24 +199,25 @@ export const TransactionsTab: React.FC = () => {
           <select
             value={selectedPayment}
             onChange={(e) => setSelectedPayment(e.target.value)}
-            className="w-full sm:w-auto px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full sm:w-auto px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
           >
-            <option value="all">{language === 'bn' ? 'পেমেন্ট মেথড' : 'All Payment Methods'}</option>
-            <option value="bKash">bKash (বিকাশ)</option>
-            <option value="Nagad">Nagad (নগদ)</option>
-            <option value="Bank Transfer">Bank Transfer (ব্যাংক)</option>
-            <option value="Credit Card">Credit Card (কার্ড)</option>
-            <option value="Cash">Cash (নগদ টাকা)</option>
+            <option value="all">All Payment Methods</option>
+            <option value="Credit Card">Credit Card</option>
+            <option value="Debit Card">Debit Card</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Mobile Wallet">Mobile Wallet</option>
+            <option value="PayPal">PayPal</option>
+            <option value="Cash">Cash</option>
           </select>
 
           {/* Sort order toggle */}
           <button
             onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-            className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 rounded-lg ml-auto"
+            className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 rounded-lg ml-auto"
             title={sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
           >
             <ArrowUpDown className="w-3.5 h-3.5" />
-            <span>{sortOrder === 'desc' ? (language === 'bn' ? 'নতুন আগে' : 'Newest') : (language === 'bn' ? 'পুরাতন আগে' : 'Oldest')}</span>
+            <span>{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</span>
           </button>
         </div>
       </div>
@@ -237,24 +227,22 @@ export const TransactionsTab: React.FC = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">{language === 'bn' ? 'তারিখ' : 'Date'}</th>
-                <th className="py-3 px-4">{language === 'bn' ? 'বিবরণ' : 'Description'}</th>
-                <th className="py-3 px-4">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</th>
-                <th className="py-3 px-4">{language === 'bn' ? 'পেমেন্ট' : 'Payment'}</th>
-                <th className="py-3 px-4 text-right">{language === 'bn' ? 'পরিমাণ (টাকা)' : 'Amount (BDT)'}</th>
-                <th className="py-3 px-4 text-right">{language === 'bn' ? 'অ্যাকশন' : 'Actions'}</th>
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Description</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Payment Method</th>
+                <th className="py-3 px-4 text-right">Amount</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
-                    <p className="text-sm font-medium">
-                      {language === 'bn' ? 'কোনো লেনদেন পাওয়া যায়নি' : 'No transactions found'}
-                    </p>
+                    <p className="text-sm font-semibold">No transactions found</p>
                     <p className="text-xs text-slate-400 mt-1">
-                      {language === 'bn' ? 'সার্চ ফিল্টার পরিবর্তন করুন অথবা নতুন লেনদেন লিখুন' : 'Try adjusting filters or record a new transaction'}
+                      Adjust your filters or add a new transaction entry.
                     </p>
                   </td>
                 </tr>
@@ -262,8 +250,7 @@ export const TransactionsTab: React.FC = () => {
                 filteredTransactions.map((tx) => {
                   const isExpense = tx.type === 'expense';
                   const catMeta = categoryLabels[tx.category] || {
-                    bn: tx.category,
-                    en: tx.category,
+                    name: tx.category,
                     color: '#64748b'
                   };
 
@@ -285,11 +272,11 @@ export const TransactionsTab: React.FC = () => {
                           </span>
                           {tx.isUnusual && (
                             <span
-                              title={tx.anomalyReason || (language === 'bn' ? 'অস্বাভাবিক ব্যয়' : 'Unusual spend')}
-                              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded cursor-help"
+                              title={tx.anomalyReason || 'Unusual expenditure spike'}
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded cursor-help"
                             >
                               <AlertTriangle className="w-3 h-3 text-amber-600" />
-                              {language === 'bn' ? 'অস্বাভাবিক' : 'Spike'}
+                              Spike
                             </span>
                           )}
                         </div>
@@ -307,7 +294,7 @@ export const TransactionsTab: React.FC = () => {
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: catMeta.color }}
                           />
-                          <span>{language === 'bn' ? catMeta.bn : catMeta.en}</span>
+                          <span>{catMeta.name}</span>
                         </span>
                       </td>
 
@@ -327,7 +314,7 @@ export const TransactionsTab: React.FC = () => {
                           }`}
                         >
                           {isExpense ? '-' : '+'}
-                          {formatTaka(tx.amount)}
+                          {formatMoney(tx.amount)}
                         </span>
                       </td>
 
@@ -339,18 +326,18 @@ export const TransactionsTab: React.FC = () => {
                               setEditingTransaction(tx);
                               setIsAddModalOpen(true);
                             }}
-                            title={language === 'bn' ? 'সম্পাদনা করুন' : 'Edit'}
+                            title="Edit Transaction"
                             className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => {
-                              if (confirm(language === 'bn' ? 'আপনি কি এই লেনদেনটি মুছতে নিশ্চিত?' : 'Delete this transaction?')) {
+                              if (confirm('Delete this transaction?')) {
                                 deleteTransaction(tx.id);
                               }
                             }}
-                            title={language === 'bn' ? 'মুছে ফেলুন' : 'Delete'}
+                            title="Delete"
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

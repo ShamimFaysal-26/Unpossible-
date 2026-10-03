@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with personal financial configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "occupation": { "type": "string" },
+        "monthlyIncome": { "type": "number" },
+        "currency": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Income or expense financial transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "date": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "note": { "type": "string" },
+        "isUnusual": { "type": "boolean" },
+        "anomalyReason": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "amount", "type", "category", "date", "paymentMethod"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Category monthly expenditure budget limit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "monthlyLimit": { "type": "number" },
+        "month": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "category", "monthlyLimit", "month"]
+    },
+    "SavingsGoal": {
+      "title": "SavingsGoal",
+      "description": "Financial target milestone with savings progress tracking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "targetDate": { "type": "string" },
+        "category": { "type": "string" },
+        "aiRecommendation": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "targetAmount", "currentAmount", "targetDate", "category"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "User income and expense transaction records"
+    },
+    "/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/Budget" },
+      "description": "Monthly category spending limits"
+    },
+    "/goals/{goalId}": {
+      "schema": { "$ref": "#/entities/SavingsGoal" },
+      "description": "Savings goals and targets"
+    }
+  }
+}

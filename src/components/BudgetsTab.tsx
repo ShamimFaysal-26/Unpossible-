@@ -2,16 +2,15 @@ import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { categoryLabels } from '../data/initialData';
 import { TransactionCategory } from '../types/finance';
-import { AlertTriangle, CheckCircle2, Edit3, Check, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Edit3, Check, Sparkles, Plus, Minus } from 'lucide-react';
 
 export const BudgetsTab: React.FC = () => {
   const {
     budgets,
     updateBudgetLimit,
+    adjustBudgetDelta,
     currentMonthSummary,
-    language,
-    formatTaka,
-    toBengaliNumber,
+    formatMoney,
     setActiveTab
   } = useFinance();
 
@@ -19,7 +18,6 @@ export const BudgetsTab: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<TransactionCategory | null>(null);
   const [tempLimit, setTempLimit] = useState<string>('');
 
-  // Total allocated vs total spent in budgeted categories
   let totalAllocatedBudget = 0;
   let totalBudgetedSpend = 0;
   let overBudgetCount = 0;
@@ -48,16 +46,14 @@ export const BudgetsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title & Overview Banner */}
+      {/* Title & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            {language === 'bn' ? 'ক্যাটাগরিভিত্তিক মাসিক বাজেট পরিকল্পনা' : 'Monthly Category Budgets'}
+            Monthly Category Budgets
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {language === 'bn'
-              ? 'খরচের সীমা নির্ধারণ করুন এবং বাজেট অতিক্রম রোধে নিয়মিত পর্যবেক্ষণ করুন'
-              : 'Set spend ceilings and stay informed before hitting critical limits'}
+            Establish category spend ceilings and adjust limits with 1-click interactive controls
           </p>
         </div>
 
@@ -66,52 +62,50 @@ export const BudgetsTab: React.FC = () => {
           className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors self-start sm:self-auto shadow-2xs"
         >
           <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{language === 'bn' ? 'এআই বাজেট অপ্টিমাইজেশন' : 'AI Budget Advice'}</span>
+          <span>Ask AI for Budget Advice</span>
         </button>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
-          <span className="text-xs font-medium text-slate-500">
-            {language === 'bn' ? 'মোট বাজেট বরাদ্দ' : 'Total Budget Allocated'}
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Total Allocated Budget
           </span>
           <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900 font-tabular">
-            {formatTaka(totalAllocatedBudget)}
+            {formatMoney(totalAllocatedBudget)}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {language === 'bn' ? '৮টি সক্রিয় ক্যাটাগরি' : 'Across 8 active categories'}
+            Across {budgets.length} active spending categories
           </p>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
-          <span className="text-xs font-medium text-slate-500">
-            {language === 'bn' ? 'মোট বাজেট ব্যয়' : 'Spent Against Budgets'}
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Total Spent Against Budget
           </span>
           <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900 font-tabular">
-            {formatTaka(totalBudgetedSpend)}
+            {formatMoney(totalBudgetedSpend)}
           </div>
           <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
             <span className="font-semibold text-slate-800">
-              {language === 'bn'
-                ? `${toBengaliNumber(Math.round((totalBudgetedSpend / (totalAllocatedBudget || 1)) * 100))}%`
-                : `${Math.round((totalBudgetedSpend / (totalAllocatedBudget || 1)) * 100)}%`}
+              {Math.round((totalBudgetedSpend / (totalAllocatedBudget || 1)) * 100)}%
             </span>
-            <span>{language === 'bn' ? 'সামগ্রিক বাজেট ব্যবহৃত' : 'of overall budget consumed'}</span>
+            <span>of overall monthly budget consumed</span>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-2xs">
-          <span className="text-xs font-medium text-slate-500">
-            {language === 'bn' ? 'বাজেট অতিক্রান্ত ক্যাটাগরি' : 'Over-Budget Categories'}
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Over-Budget Categories
           </span>
           <div className={`mt-2 text-2xl font-bold tracking-tight font-tabular ${overBudgetCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {language === 'bn' ? `${toBengaliNumber(overBudgetCount)}টি` : `${overBudgetCount} Categories`}
+            {overBudgetCount} {overBudgetCount === 1 ? 'Category' : 'Categories'}
           </div>
           <p className="text-xs text-slate-400 mt-1">
             {overBudgetCount > 0
-              ? (language === 'bn' ? 'তাৎক্ষণিক সতর্কতা প্রয়োজন' : 'Requires spending restriction')
-              : (language === 'bn' ? 'সবগুলো সীমা নিয়ন্ত্রিত' : 'All categories within budget')}
+              ? 'Discretionary spending cuts recommended'
+              : 'All categories safely within limits'}
           </p>
         </div>
       </div>
@@ -128,10 +122,8 @@ export const BudgetsTab: React.FC = () => {
           const isEditing = editingCategory === b.category;
 
           const meta = categoryLabels[b.category] || {
-            bn: b.category,
-            en: b.category,
-            color: '#64748b',
-            bg: 'bg-slate-100 text-slate-700'
+            name: b.category,
+            color: '#64748b'
           };
 
           return (
@@ -154,30 +146,29 @@ export const BudgetsTab: React.FC = () => {
                   />
                   <div>
                     <h2 className="text-sm font-bold text-slate-900">
-                      {language === 'bn' ? meta.bn : meta.en}
+                      {meta.name}
                     </h2>
                     <span className="text-[11px] text-slate-400">
-                      {language === 'bn' ? 'চলতি মাস (অক্টোবর ২০২৬)' : 'October 2026'}
+                      Monthly Cycle
                     </span>
                   </div>
                 </div>
 
-                {/* Status tag */}
                 <div>
                   {isOver ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
                       <AlertTriangle className="w-3 h-3 text-rose-600" />
-                      {language === 'bn' ? 'অতিক্রান্ত' : 'Exceeded'}
+                      Exceeded
                     </span>
                   ) : isWarning ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
                       <AlertTriangle className="w-3 h-3 text-amber-600" />
-                      {language === 'bn' ? 'সীমার কাছে' : 'Warning'}
+                      Warning (80%+)
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      {language === 'bn' ? 'নিয়ন্ত্রিত' : 'On Track'}
+                      On Track
                     </span>
                   )}
                 </div>
@@ -187,16 +178,16 @@ export const BudgetsTab: React.FC = () => {
               <div className="mt-4 flex items-baseline justify-between text-xs font-tabular">
                 <div>
                   <span className="text-slate-400 block text-[10px]">
-                    {language === 'bn' ? 'ব্যয় হয়েছে' : 'Spent'}
+                    Current Spend
                   </span>
                   <span className={`text-base font-bold ${isOver ? 'text-rose-600' : 'text-slate-900'}`}>
-                    {formatTaka(spent)}
+                    {formatMoney(spent)}
                   </span>
                 </div>
 
                 <div className="text-right">
                   <span className="text-slate-400 block text-[10px]">
-                    {language === 'bn' ? 'নির্ধারিত বাজেট' : 'Monthly Limit'}
+                    Monthly Budget Limit
                   </span>
                   {isEditing ? (
                     <div className="flex items-center gap-1 mt-0.5">
@@ -218,9 +209,9 @@ export const BudgetsTab: React.FC = () => {
                     <button
                       onClick={() => handleStartEdit(b.category, limit)}
                       className="text-base font-bold text-slate-700 hover:text-emerald-600 inline-flex items-center gap-1 group"
-                      title={language === 'bn' ? 'বাজেট পরিবর্তন করতে ক্লিক করুন' : 'Click to edit limit'}
+                      title="Click to edit limit"
                     >
-                      <span>{formatTaka(limit)}</span>
+                      <span>{formatMoney(limit)}</span>
                       <Edit3 className="w-3 h-3 text-slate-400 group-hover:text-emerald-600 transition-colors" />
                     </button>
                   )}
@@ -241,22 +232,29 @@ export const BudgetsTab: React.FC = () => {
                 />
               </div>
 
-              {/* Bottom footer text */}
-              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 font-tabular">
-                <span>
-                  {language === 'bn'
-                    ? `${toBengaliNumber(percentage)}% ব্যবহৃত`
-                    : `${percentage}% consumed`}
+              {/* Interactive Quick +/- Stepper Controls */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span className="font-tabular font-medium">
+                  {percentage}% used &middot; {isOver ? `Over by ${formatMoney(spent - limit)}` : `${formatMoney(remaining)} remaining`}
                 </span>
-                <span>
-                  {isOver
-                    ? (language === 'bn'
-                        ? `অতিরিক্ত ব্যয়: ${formatTaka(spent - limit)}`
-                        : `Over by: ${formatTaka(spent - limit)}`)
-                    : (language === 'bn'
-                        ? `অবশিষ্ট: ${formatTaka(remaining)}`
-                        : `Remaining: ${formatTaka(remaining)}`)}
-                </span>
+
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-slate-400 mr-1">Adjust:</span>
+                  <button
+                    onClick={() => adjustBudgetDelta(b.category, -50)}
+                    title="Decrease budget by $50"
+                    className="p-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => adjustBudgetDelta(b.category, 50)}
+                    title="Increase budget by $50"
+                    className="p-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           );
