@@ -23,11 +23,13 @@ export const TransactionModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit Card');
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);
   const [aiSuggestionReason, setAiSuggestionReason] = useState<string | null>(null);
 
   // Populate when editing
   useEffect(() => {
+    setFormError(null);
     if (editingTransaction) {
       setTitle(editingTransaction.title);
       setAmount(String(editingTransaction.amount));
@@ -74,9 +76,10 @@ export const TransactionModal: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     const numAmount = parseFloat(amount);
     if (!title.trim() || isNaN(numAmount) || numAmount <= 0) {
-      alert('Please enter a valid title and positive amount.');
+      setFormError('Please enter a valid description and an amount greater than 0.');
       return;
     }
 
@@ -132,6 +135,12 @@ export const TransactionModal: React.FC = () => {
 
         {/* Modal Body Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+          {formError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-medium">
+              {formError}
+            </div>
+          )}
+
           {/* Type Toggle: Expense vs Income */}
           <div>
             <label className="block text-slate-700 font-semibold mb-1.5">

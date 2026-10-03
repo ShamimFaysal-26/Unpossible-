@@ -87,10 +87,9 @@ export const CsvImportModal: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleImportSubmit = () => {
+  const handleImportSubmit = async () => {
     if (parsedRows.length === 0) return;
-    const count = importTransactionsFromCsv(parsedRows);
-    alert(`Successfully imported ${count} transactions into your ledger!`);
+    await importTransactionsFromCsv(parsedRows);
     setIsImportModalOpen(false);
     setParsedRows([]);
     setCsvText('');

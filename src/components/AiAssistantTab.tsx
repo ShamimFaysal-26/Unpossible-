@@ -67,7 +67,15 @@ export const AiAssistantTab: React.FC = () => {
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert('Speech recognition is not supported in this browser.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_voice_notice_${Date.now()}`,
+          sender: 'assistant',
+          text: 'Voice speech recognition is not supported in this browser environment. You can type your financial query directly in the input box below!',
+          timestamp: 'Just now'
+        }
+      ]);
       return;
     }
 

@@ -15,19 +15,22 @@ export const GoalsTab: React.FC = () => {
   } = useFinance();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newTarget, setNewTarget] = useState('');
   const [newDate, setNewDate] = useState('2027-02-28');
   const [newCategory, setNewCategory] = useState('Safety');
+  const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
 
   const [activeGoalAction, setActiveGoalAction] = useState<{ id: string; type: 'deposit' | 'withdraw' } | null>(null);
   const [actionAmount, setActionAmount] = useState<string>('');
 
   const handleCreateGoal = (e: React.FormEvent) => {
     e.preventDefault();
+    setCreateError(null);
     const target = parseFloat(newTarget);
     if (!newTitle.trim() || isNaN(target) || target <= 0) {
-      alert('Please provide a valid goal title and target amount.');
+      setCreateError('Please provide a valid goal title and target amount greater than 0.');
       return;
     }
 
@@ -163,17 +166,34 @@ export const GoalsTab: React.FC = () => {
                       {g.title}
                     </h2>
                   </div>
+              {deletingGoalId === g.id ? (
+                <div className="flex items-center gap-1.5 bg-rose-50 px-2 py-1 rounded border border-rose-200">
+                  <span className="text-[10px] font-bold text-rose-700">Delete?</span>
                   <button
                     onClick={() => {
-                      if (confirm('Delete this savings goal?')) {
-                        deleteGoal(g.id);
-                      }
+                      deleteGoal(g.id);
+                      setDeletingGoalId(null);
                     }}
-                    title="Delete Goal"
-                    className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors"
+                    className="text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-700"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    Yes
                   </button>
+                  <button
+                    onClick={() => setDeletingGoalId(null)}
+                    className="text-[10px] text-slate-600 hover:text-slate-900 px-1 py-0.5"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeletingGoalId(g.id)}
+                  title="Delete Goal"
+                  className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
                 </div>
 
                 {/* Amount display */}
@@ -294,6 +314,11 @@ export const GoalsTab: React.FC = () => {
             </h2>
 
             <form onSubmit={handleCreateGoal} className="space-y-3">
+              {createError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-medium">
+                  {createError}
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
                   Goal Title *

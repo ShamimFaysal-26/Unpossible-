@@ -32,6 +32,7 @@ export const TransactionsTab: React.FC = () => {
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
   const [selectedPayment, setSelectedPayment] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
 
   // Filter & Sort
   const filteredTransactions = useMemo(() => {
@@ -331,17 +332,34 @@ export const TransactionsTab: React.FC = () => {
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Delete this transaction?')) {
-                                deleteTransaction(tx.id);
-                              }
-                            }}
-                            title="Delete"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {deletingTxId === tx.id ? (
+                            <div className="inline-flex items-center gap-1 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              <span className="text-[10px] font-bold text-rose-700">Delete?</span>
+                              <button
+                                onClick={() => {
+                                  deleteTransaction(tx.id);
+                                  setDeletingTxId(null);
+                                }}
+                                className="text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-700"
+                              >
+                                Yes
+                              </button>
+                              <button
+                                onClick={() => setDeletingTxId(null)}
+                                className="text-[10px] text-slate-600 hover:text-slate-900 px-1 py-0.5"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeletingTxId(tx.id)}
+                              title="Delete Transaction"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

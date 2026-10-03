@@ -30,8 +30,7 @@
         "paymentMethod": { "type": "string" },
         "note": { "type": "string" },
         "isUnusual": { "type": "boolean" },
-        "anomalyReason": { "type": "string" },
-        "userId": { "type": "string" }
+        "deviceId": { "type": "string" }
       },
       "required": ["id", "title", "amount", "type", "category", "date", "paymentMethod"]
     },
@@ -44,7 +43,7 @@
         "category": { "type": "string" },
         "monthlyLimit": { "type": "number" },
         "month": { "type": "string" },
-        "userId": { "type": "string" }
+        "deviceId": { "type": "string" }
       },
       "required": ["id", "category", "monthlyLimit", "month"]
     },
@@ -59,28 +58,27 @@
         "currentAmount": { "type": "number" },
         "targetDate": { "type": "string" },
         "category": { "type": "string" },
-        "aiRecommendation": { "type": "string" },
-        "userId": { "type": "string" }
+        "deviceId": { "type": "string" }
       },
       "required": ["id", "title", "targetAmount", "currentAmount", "targetDate", "category"]
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/User" },
-      "description": "User profiles"
-    },
-    "/transactions/{transactionId}": {
+    "/devices/{deviceId}/transactions/{transactionId}": {
       "schema": { "$ref": "#/entities/Transaction" },
-      "description": "User income and expense transaction records"
+      "description": "Per-device isolated income and expense transaction records"
     },
-    "/budgets/{budgetId}": {
+    "/devices/{deviceId}/budgets/{budgetId}": {
       "schema": { "$ref": "#/entities/Budget" },
-      "description": "Monthly category spending limits"
+      "description": "Per-device isolated category budget limits"
     },
-    "/goals/{goalId}": {
+    "/devices/{deviceId}/goals/{goalId}": {
       "schema": { "$ref": "#/entities/SavingsGoal" },
-      "description": "Savings goals and targets"
+      "description": "Per-device isolated savings goals"
+    },
+    "/devices/{deviceId}/profile/user": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Per-device isolated user profile"
     }
   }
 }

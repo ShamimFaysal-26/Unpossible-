@@ -17,6 +17,7 @@ import {
 import { fetchAiInsights } from '../services/api';
 import { validateFirestoreConnection } from '../lib/firebase';
 import {
+  getOrCreateDeviceId,
   subscribeTransactions,
   subscribeBudgets,
   subscribeGoals,
@@ -25,10 +26,12 @@ import {
   saveBudgetToDb,
   saveGoalToDb,
   deleteGoalFromDb,
-  clearAllDataFromFirestore
+  clearDeviceDataFromFirestore
 } from '../services/dbService';
 
 interface FinanceContextType {
+  deviceId: string;
+  setCustomDeviceId: (id: string) => void;
   user: UserProfile;
   setUser: (u: UserProfile) => void;
   currency: string;
@@ -90,54 +93,50 @@ interface FinanceContextType {
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEYS = {
-  USER: 'finsathi_user_permanent',
-  CURRENCY: 'finsathi_currency_permanent',
-  TRANSACTIONS: 'finsathi_transactions_permanent',
-  BUDGETS: 'finsathi_budgets_permanent',
-  GOALS: 'finsathi_goals_permanent',
-  INSIGHTS: 'finsathi_insights_permanent'
-};
-
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Initial State from Permanent LocalStorage Cache
+  // 1. Device Identification (Isolated multi-tenant space per device)
+  const [deviceId, setDeviceIdState] = useState<string>(() => getOrCreateDeviceId());
+
+  const getStorageKey = (key: string) => `finsathi_${deviceId}_${key}`;
+
+  // State loaded from device-isolated storage
   const [user, setUserState] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.USER);
+    const saved = localStorage.getItem(getStorageKey('user'));
     return saved ? JSON.parse(saved) : initialUser;
   });
 
   const [currency, setCurrencyState] = useState<string>(() => {
-    return localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENCY) || '$';
+    return localStorage.getItem(getStorageKey('currency')) || '$';
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
+    const saved = localStorage.getItem(getStorageKey('transactions'));
     return saved ? JSON.parse(saved) : [];
   });
 
   const [budgets, setBudgets] = useState<Budget[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.BUDGETS);
+    const saved = localStorage.getItem(getStorageKey('budgets'));
     return saved ? JSON.parse(saved) : initialBudgets;
   });
 
   const [goals, setGoals] = useState<SavingsGoal[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.GOALS);
+    const saved = localStorage.getItem(getStorageKey('goals'));
     return saved ? JSON.parse(saved) : initialGoals;
   });
 
   const [insights, setInsights] = useState<FinancialInsight[]>(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.INSIGHTS);
+    const saved = localStorage.getItem(getStorageKey('insights'));
     return saved ? JSON.parse(saved) : initialInsights;
   });
 
   const [anomalyAlerts, setAnomalyAlerts] = useState<AnomalyReport[]>([]);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState<boolean>(false);
 
-  // Database info & status
+  // Database status
   const [dbInfo, setDbInfo] = useState<{ connected: boolean; engine: string; details: string; isSyncing: boolean }>({
     connected: true,
     engine: 'Firebase Cloud Firestore',
-    details: 'Connected to Firestore. Real-time permanent synchronization active.',
+    details: `Connected to Firestore. Isolated database active for Device: ${deviceId}`,
     isSyncing: false
   });
 
@@ -150,43 +149,53 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setUser = (u: UserProfile) => {
     setUserState(u);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(u));
+    localStorage.setItem(getStorageKey('user'), JSON.stringify(u));
   };
 
   const setCurrency = (c: string) => {
     setCurrencyState(c);
-    localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENCY, c);
+    localStorage.setItem(getStorageKey('currency'), c);
+  };
+
+  const setCustomDeviceId = (newId: string) => {
+    const cleaned = newId.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    if (cleaned.length >= 4) {
+      localStorage.setItem('finsathi_device_id', cleaned);
+      setDeviceIdState(cleaned);
+      // Reload page to re-bind real-time listeners to the new device ID
+      window.location.reload();
+    }
   };
 
   // Keep LocalStorage in sync whenever state changes
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions));
-  }, [transactions]);
+    localStorage.setItem(getStorageKey('transactions'), JSON.stringify(transactions));
+  }, [transactions, deviceId]);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(budgets));
-  }, [budgets]);
+    localStorage.setItem(getStorageKey('budgets'), JSON.stringify(budgets));
+  }, [budgets, deviceId]);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(goals));
-  }, [goals]);
+    localStorage.setItem(getStorageKey('goals'), JSON.stringify(goals));
+  }, [goals, deviceId]);
 
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.INSIGHTS, JSON.stringify(insights));
-  }, [insights]);
+    localStorage.setItem(getStorageKey('insights'), JSON.stringify(insights));
+  }, [insights, deviceId]);
 
-  // Keep track of whether initial cloud sync has completed
+  // Keep track of whether initial cloud sync has completed for this device
   const hasLoadedRemoteTxs = useRef(false);
   const hasLoadedRemoteBudgets = useRef(false);
   const hasLoadedRemoteGoals = useRef(false);
 
-  // 2. Real-Time Cloud Firestore Sync with onSnapshot listeners
+  // 2. Real-Time Cloud Firestore Sync isolated strictly to this device
   useEffect(() => {
     let unsubTxs: (() => void) | undefined;
     let unsubBudgets: (() => void) | undefined;
     let unsubGoals: (() => void) | undefined;
 
-    async function initFirestoreRealtime() {
+    async function initDeviceFirestore() {
       try {
         setDbInfo(prev => ({ ...prev, isSyncing: true }));
         const isConnected = await validateFirestoreConnection();
@@ -195,24 +204,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setDbInfo({
             connected: true,
             engine: 'Firebase Cloud Firestore',
-            details: 'Connected to Firestore cloud database. Permanent real-time sync active.',
+            details: `Connected to Firestore. Permanent storage isolated to Device: ${deviceId}`,
             isSyncing: false
           });
 
-          // Subscribe to Transactions
-          unsubTxs = subscribeTransactions((cloudTxs) => {
+          // Subscribe to device's Transactions
+          unsubTxs = subscribeTransactions(deviceId, (cloudTxs) => {
             if (cloudTxs.length > 0) {
               setTransactions(cloudTxs);
               hasLoadedRemoteTxs.current = true;
             } else if (!hasLoadedRemoteTxs.current) {
-              // If cloud is empty on first load, check if local storage had user transactions to push to cloud
               hasLoadedRemoteTxs.current = true;
-              const localTxsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
+              const localTxsStr = localStorage.getItem(getStorageKey('transactions'));
               if (localTxsStr) {
                 try {
                   const localTxs: Transaction[] = JSON.parse(localTxsStr);
                   if (localTxs.length > 0) {
-                    localTxs.forEach(t => saveTransactionToDb(t));
+                    localTxs.forEach(t => saveTransactionToDb(deviceId, t));
                   }
                 } catch (e) {
                   console.warn('Failed to parse local transactions:', e);
@@ -223,19 +231,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           });
 
-          // Subscribe to Budgets
-          unsubBudgets = subscribeBudgets((cloudBudgets) => {
+          // Subscribe to device's Budgets
+          unsubBudgets = subscribeBudgets(deviceId, (cloudBudgets) => {
             if (cloudBudgets.length > 0) {
               setBudgets(cloudBudgets);
               hasLoadedRemoteBudgets.current = true;
             } else if (!hasLoadedRemoteBudgets.current) {
               hasLoadedRemoteBudgets.current = true;
-              const localBudgetsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.BUDGETS);
+              const localBudgetsStr = localStorage.getItem(getStorageKey('budgets'));
               if (localBudgetsStr) {
                 try {
                   const localBudgets: Budget[] = JSON.parse(localBudgetsStr);
                   if (localBudgets.length > 0) {
-                    localBudgets.forEach(b => saveBudgetToDb(b));
+                    localBudgets.forEach(b => saveBudgetToDb(deviceId, b));
                   }
                 } catch (e) {
                   console.warn('Failed to parse local budgets:', e);
@@ -244,19 +252,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           });
 
-          // Subscribe to Goals
-          unsubGoals = subscribeGoals((cloudGoals) => {
+          // Subscribe to device's Goals
+          unsubGoals = subscribeGoals(deviceId, (cloudGoals) => {
             if (cloudGoals.length > 0) {
               setGoals(cloudGoals);
               hasLoadedRemoteGoals.current = true;
             } else if (!hasLoadedRemoteGoals.current) {
               hasLoadedRemoteGoals.current = true;
-              const localGoalsStr = localStorage.getItem(LOCAL_STORAGE_KEYS.GOALS);
+              const localGoalsStr = localStorage.getItem(getStorageKey('goals'));
               if (localGoalsStr) {
                 try {
                   const localGoals: SavingsGoal[] = JSON.parse(localGoalsStr);
                   if (localGoals.length > 0) {
-                    localGoals.forEach(g => saveGoalToDb(g));
+                    localGoals.forEach(g => saveGoalToDb(deviceId, g));
                   }
                 } catch (e) {
                   console.warn('Failed to parse local goals:', e);
@@ -268,19 +276,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
         }
       } catch (err) {
-        console.warn('Real-time listener setup error:', err);
+        console.warn(`[Device ${deviceId}] Firestore setup warning:`, err);
         setDbInfo(prev => ({ ...prev, isSyncing: false }));
       }
     }
 
-    initFirestoreRealtime();
+    initDeviceFirestore();
 
     return () => {
       if (unsubTxs) unsubTxs();
       if (unsubBudgets) unsubBudgets();
       if (unsubGoals) unsubGoals();
     };
-  }, []);
+  }, [deviceId]);
 
   const checkDb = async () => {
     setDbInfo(prev => ({ ...prev, isSyncing: true }));
@@ -289,23 +297,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       connected: isConnected,
       engine: 'Firebase Cloud Firestore',
       details: isConnected
-        ? 'Connected to Firestore. All transactions, budgets, and goals are permanently stored in the cloud.'
+        ? `Connected to Firestore. All records are permanently stored in private cloud space for Device: ${deviceId}.`
         : 'Connecting to Firestore cloud database...',
       isSyncing: false
     });
   };
 
-  // Full reset / clear database action (Only when user explicitly clicks Wipe All Data)
+  // Full reset / clear database action for THIS device only
   const resetAllDataToEmpty = async () => {
     setDbInfo(prev => ({ ...prev, isSyncing: true }));
     setTransactions([]);
     setGoals([]);
     setInsights([]);
     setAnomalyAlerts([]);
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.TRANSACTIONS);
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.GOALS);
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.INSIGHTS);
-    await clearAllDataFromFirestore();
+    localStorage.removeItem(getStorageKey('transactions'));
+    localStorage.removeItem(getStorageKey('goals'));
+    localStorage.removeItem(getStorageKey('insights'));
+    await clearDeviceDataFromFirestore(deviceId);
     setDbInfo(prev => ({ ...prev, isSyncing: false }));
   };
 
@@ -409,7 +417,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Add Transaction + Save to Firestore Permanently
+  // Add Transaction + Save to Firestore Permanently for this Device
   const addTransaction = async (newTx: Omit<Transaction, 'id'>): Promise<Transaction> => {
     const created: Transaction = {
       ...newTx,
@@ -418,14 +426,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // 1. Immediate optimistic UI & LocalStorage update
     setTransactions(prev => [created, ...prev]);
     const updatedList = [created, ...transactions];
-    localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updatedList));
+    localStorage.setItem(getStorageKey('transactions'), JSON.stringify(updatedList));
 
-    // 2. Permanent Firestore write
+    // 2. Permanent Firestore write under this device's collection
     try {
       setDbInfo(prev => ({ ...prev, isSyncing: true }));
-      await saveTransactionToDb(created);
+      await saveTransactionToDb(deviceId, created);
     } catch (err) {
-      console.warn('Background Firestore write warning:', err);
+      console.warn(`[Device ${deviceId}] Firestore write warning:`, err);
     } finally {
       setDbInfo(prev => ({ ...prev, isSyncing: false }));
     }
@@ -457,16 +465,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         return tx;
       });
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('transactions'), JSON.stringify(updated));
       return updated;
     });
 
     if (updatedTarget) {
       try {
         setDbInfo(prev => ({ ...prev, isSyncing: true }));
-        await saveTransactionToDb(updatedTarget);
+        await saveTransactionToDb(deviceId, updatedTarget);
       } catch (err) {
-        console.warn('Firestore update warning:', err);
+        console.warn(`[Device ${deviceId}] Firestore update warning:`, err);
       } finally {
         setDbInfo(prev => ({ ...prev, isSyncing: false }));
       }
@@ -477,21 +485,21 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteTransaction = async (id: string) => {
     setTransactions(prev => {
       const filtered = prev.filter(tx => tx.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(filtered));
+      localStorage.setItem(getStorageKey('transactions'), JSON.stringify(filtered));
       return filtered;
     });
 
     try {
       setDbInfo(prev => ({ ...prev, isSyncing: true }));
-      await deleteTransactionFromDb(id);
+      await deleteTransactionFromDb(deviceId, id);
     } catch (err) {
-      console.warn('Firestore delete warning:', err);
+      console.warn(`[Device ${deviceId}] Firestore delete warning:`, err);
     } finally {
       setDbInfo(prev => ({ ...prev, isSyncing: false }));
     }
   };
 
-  // Batch CSV Import + Save to Firestore
+  // Batch CSV Import + Save to Firestore for this Device
   const importTransactionsFromCsv = async (newTxList: Omit<Transaction, 'id'>[]): Promise<number> => {
     const formatted: Transaction[] = newTxList.map((tx, idx) => ({
       ...tx,
@@ -500,17 +508,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setTransactions(prev => {
       const merged = [...formatted, ...prev];
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TRANSACTIONS, JSON.stringify(merged));
+      localStorage.setItem(getStorageKey('transactions'), JSON.stringify(merged));
       return merged;
     });
 
     try {
       setDbInfo(prev => ({ ...prev, isSyncing: true }));
       for (const tx of formatted) {
-        await saveTransactionToDb(tx);
+        await saveTransactionToDb(deviceId, tx);
       }
     } catch (err) {
-      console.warn('Firestore batch import warning:', err);
+      console.warn(`[Device ${deviceId}] Batch import warning:`, err);
     } finally {
       setDbInfo(prev => ({ ...prev, isSyncing: false }));
     }
@@ -518,7 +526,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return formatted.length;
   };
 
-  // Update Budget Limit + Save to Firestore
+  // Update Budget Limit + Save to Firestore for this Device
   const updateBudgetLimit = async (category: TransactionCategory, newLimit: number) => {
     let targetBudget: Budget | undefined;
     setBudgets(prev => {
@@ -530,39 +538,39 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updated = [...prev, { id: `b_${Date.now()}`, category, monthlyLimit: newLimit, month: '2026-10' }];
       }
       targetBudget = updated.find(b => b.category === category);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('budgets'), JSON.stringify(updated));
       return updated;
     });
 
     if (targetBudget) {
       try {
-        await saveBudgetToDb(targetBudget);
+        await saveBudgetToDb(deviceId, targetBudget);
       } catch (err) {
-        console.warn('Firestore budget save warning:', err);
+        console.warn(`[Device ${deviceId}] Budget save warning:`, err);
       }
     }
   };
 
-  // Adjust Budget by delta (+/- 50) + Save to Firestore
+  // Adjust Budget by delta (+/- 50) + Save to Firestore for this Device
   const adjustBudgetDelta = async (category: TransactionCategory, delta: number) => {
     let targetBudget: Budget | undefined;
     setBudgets(prev => {
       const updated = prev.map(b => (b.category === category ? { ...b, monthlyLimit: Math.max(0, b.monthlyLimit + delta) } : b));
       targetBudget = updated.find(b => b.category === category);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.BUDGETS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('budgets'), JSON.stringify(updated));
       return updated;
     });
 
     if (targetBudget) {
       try {
-        await saveBudgetToDb(targetBudget);
+        await saveBudgetToDb(deviceId, targetBudget);
       } catch (err) {
-        console.warn('Firestore budget delta save warning:', err);
+        console.warn(`[Device ${deviceId}] Budget delta save warning:`, err);
       }
     }
   };
 
-  // Add Goal + Save to Firestore
+  // Add Goal + Save to Firestore for this Device
   const addSavingsGoal = async (newGoal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => {
     const goal: SavingsGoal = {
       ...newGoal,
@@ -571,73 +579,75 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
     setGoals(prev => {
       const updated = [goal, ...prev];
-      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('goals'), JSON.stringify(updated));
       return updated;
     });
 
     try {
-      await saveGoalToDb(goal);
+      await saveGoalToDb(deviceId, goal);
     } catch (err) {
-      console.warn('Firestore goal save warning:', err);
+      console.warn(`[Device ${deviceId}] Goal save warning:`, err);
     }
   };
 
-  // Contribute to Goal + Save to Firestore
+  // Contribute to Goal + Save to Firestore for this Device
   const contributeToGoal = async (goalId: string, amount: number) => {
     let targetGoal: SavingsGoal | undefined;
     setGoals(prev => {
       const updated = prev.map(g => (g.id === goalId ? { ...g, currentAmount: Math.min(g.targetAmount, g.currentAmount + amount) } : g));
       targetGoal = updated.find(g => g.id === goalId);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('goals'), JSON.stringify(updated));
       return updated;
     });
 
     if (targetGoal) {
       try {
-        await saveGoalToDb(targetGoal);
+        await saveGoalToDb(deviceId, targetGoal);
       } catch (err) {
-        console.warn('Firestore goal contribute warning:', err);
+        console.warn(`[Device ${deviceId}] Goal contribute warning:`, err);
       }
     }
   };
 
-  // Withdraw from Goal + Save to Firestore
+  // Withdraw from Goal + Save to Firestore for this Device
   const withdrawFromGoal = async (goalId: string, amount: number) => {
     let targetGoal: SavingsGoal | undefined;
     setGoals(prev => {
       const updated = prev.map(g => (g.id === goalId ? { ...g, currentAmount: Math.max(0, g.currentAmount - amount) } : g));
       targetGoal = updated.find(g => g.id === goalId);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(updated));
+      localStorage.setItem(getStorageKey('goals'), JSON.stringify(updated));
       return updated;
     });
 
     if (targetGoal) {
       try {
-        await saveGoalToDb(targetGoal);
+        await saveGoalToDb(deviceId, targetGoal);
       } catch (err) {
-        console.warn('Firestore goal withdraw warning:', err);
+        console.warn(`[Device ${deviceId}] Goal withdraw warning:`, err);
       }
     }
   };
 
-  // Delete Goal + Remove from Firestore
+  // Delete Goal + Remove from Firestore for this Device
   const deleteGoal = async (goalId: string) => {
     setGoals(prev => {
       const filtered = prev.filter(g => g.id !== goalId);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.GOALS, JSON.stringify(filtered));
+      localStorage.setItem(getStorageKey('goals'), JSON.stringify(filtered));
       return filtered;
     });
 
     try {
-      await deleteGoalFromDb(goalId);
+      await deleteGoalFromDb(deviceId, goalId);
     } catch (err) {
-      console.warn('Firestore goal delete warning:', err);
+      console.warn(`[Device ${deviceId}] Goal delete warning:`, err);
     }
   };
 
   return (
     <FinanceContext.Provider
       value={{
+        deviceId,
+        setCustomDeviceId,
         user,
         setUser,
         currency,
