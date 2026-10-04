@@ -66,19 +66,19 @@
   "firestore": {
     "/devices/{deviceId}/transactions/{transactionId}": {
       "schema": { "$ref": "#/entities/Transaction" },
-      "description": "Per-device isolated income and expense transaction records"
+      "description": "Per-device and authenticated user isolated income and expense transaction records"
     },
     "/devices/{deviceId}/budgets/{budgetId}": {
       "schema": { "$ref": "#/entities/Budget" },
-      "description": "Per-device isolated category budget limits"
+      "description": "Per-device and authenticated user isolated category budget limits"
     },
     "/devices/{deviceId}/goals/{goalId}": {
       "schema": { "$ref": "#/entities/SavingsGoal" },
-      "description": "Per-device isolated savings goals"
+      "description": "Per-device and authenticated user isolated savings goals"
     },
     "/devices/{deviceId}/profile/user": {
       "schema": { "$ref": "#/entities/User" },
-      "description": "Per-device isolated user profile"
+      "description": "Per-device and authenticated user isolated profile configuration"
     }
   }
 }

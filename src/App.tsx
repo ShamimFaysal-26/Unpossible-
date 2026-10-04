@@ -10,6 +10,7 @@ import { AiAssistantTab } from './components/AiAssistantTab';
 import { TransactionModal } from './components/TransactionModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { DatabaseModal } from './components/DatabaseModal';
+import { AuthModal } from './components/AuthModal';
 import { Sparkles, Database } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -44,6 +45,7 @@ const MainContent: React.FC = () => {
       <TransactionModal />
       <CsvImportModal />
       <DatabaseModal />
+      <AuthModal />
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 mt-auto py-6">
